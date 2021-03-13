@@ -1,0 +1,11 @@
+[package]
+name = "client"
+version = "0.1.0"
+authors = ["Cassy343 <isilversmith810@gmail.com>"]
+edition = "2018"
+
+
+[dependencies]
+
+[lib]
+crate-type =["cdylib"]
