@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs, path::Path, rc::{Rc, Weak}};
+use std::{
+    collections::HashMap,
+    fs,
+    path::Path,
+    rc::{Rc, Weak},
+};
 
 use common::{Pack, Prompt, Response};
 use rand::Rng;
@@ -50,7 +55,7 @@ impl PackStore {
             possible_packs,
             pack_dir: pack_dir.to_owned(),
             loaded_packs: HashMap::new(),
-            official_packs
+            official_packs,
         })
     }
 
@@ -65,9 +70,15 @@ impl PackStore {
             })
         } else if self.possible_packs.contains(&pack_name.to_owned()) {
             let pack = if self.official_packs.contains(&pack_name.to_owned()) {
-                Self::read_pack(Path::new(&format!("{}/official/{}", self.pack_dir, pack_name)))?
+                Self::read_pack(Path::new(&format!(
+                    "{}/official/{}",
+                    self.pack_dir, pack_name
+                )))?
             } else {
-                Self::read_pack(Path::new(&format!("{}/custom/{}", self.pack_dir, pack_name)))?
+                Self::read_pack(Path::new(&format!(
+                    "{}/custom/{}",
+                    self.pack_dir, pack_name
+                )))?
             };
 
             self.loaded_packs
@@ -93,6 +104,26 @@ impl PackStore {
             if Rc::strong_count(pack) == 1 {
                 self.loaded_packs.remove(pack_name);
             }
+        }
+    }
+
+    pub fn create_pack(&mut self, pack: Pack) -> Result<(), String> {
+        let pack_name = pack.name.clone();
+
+        let json = match serde_json::to_string(&pack) {
+            Ok(j) => j,
+            Err(e) => return Err(format!("Error serializing pack: {}", e)),
+        };
+
+        match fs::write(
+            &format!("{}/custom/{}.json", self.pack_dir, pack_name),
+            json,
+        ) {
+            Ok(_) => {
+                self.possible_packs.push(format!("{}.json", pack_name));
+                Ok(())
+            }
+            Err(e) => Err(format!("Error writing to file: {}", e)),
         }
     }
 
@@ -127,7 +158,7 @@ impl PackHandle {
             index = rng.gen_range(0 .. self.pack.prompts.len());
 
             if !self.used_prompts.contains(&index) {
-                break
+                break;
             }
         }
 
@@ -146,7 +177,7 @@ impl PackHandle {
             index = rng.gen_range(0 .. self.pack.responses.len());
 
             if !self.used_responses.contains(&index) {
-                break
+                break;
             }
         }
 
