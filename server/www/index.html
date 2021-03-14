@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+        <title>Cards for Humanity</title>
+    </head>
+
+    <body>
+        It works!
+
+        <script type='module'>
+            import init, { client_main } from './client.js';
+
+            async function run() {
+                await init();
+                client_main();
+            }
+
+            run();
+        </script>
+    </body>
+</html>
