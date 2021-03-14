@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    zip_writer.add_directory("www/client", Default::default())?;
     copy_client_file(&mut zip_writer, "client.js")?;
     copy_client_file(&mut zip_writer, "client_bg.wasm")?;
 
@@ -34,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn copy_client_file(zip_writer: &mut ZipWriter<File>, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    zip_writer.start_file(&format!("www/{}", name), Default::default())?;
+    zip_writer.start_file(&format!("www/client/{}", name), Default::default())?;
     copy(&mut File::open(&format!("../target/client-out/{}", name))?, zip_writer)?;
     Ok(())
 }

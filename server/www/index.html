@@ -9,10 +9,10 @@
         It works!
 
         <script type='module'>
-            import init, { client_main } from './client.js';
+            import init, { client_main } from './client/client.js';
 
             async function run() {
-                await init();
+                await init(new URL('./client/client_bg.wasm', import.meta.url));
                 client_main();
             }
 

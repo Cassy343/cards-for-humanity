@@ -1,11 +1,16 @@
-use warp::{Filter, ws::{Ws, WebSocket}};
-use futures::{StreamExt, channel::oneshot::{self, Sender}};
+mod packs;
+mod server;
+
+use warp::{Filter, ws::{Ws, WebSocket, Message}};
+use futures::{SinkExt, StreamExt, channel::{oneshot::{self, Sender}, mpsc}};
 use zip::ZipArchive;
-use std::io::{Cursor, copy, Error as IoError};
+use std::{io::{Cursor, copy, Error as IoError}, sync::atomic::AtomicUsize};
 use std::fs::{File, create_dir_all};
 use std::path::Path;
-
-mod packs;
+use std::net::SocketAddr;
+use std::sync::{Arc, atomic::Ordering};
+use server::{WsServerHandler, WsServerHandlerInner};
+use tokio::sync::Mutex;
 
 const CLIENT_FILES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client.zip"));
 
@@ -20,10 +25,16 @@ async fn main() {
         _ => {}
     }
 
-    let shutdown_hook = start_server().await;
-    loop {}
+    let ws_server_handler = Arc::new(Mutex::new(WsServerHandlerInner::new()));
+    let shutdown_hook = start_server(ws_server_handler.clone()).await;
+    
+    loop {
+        ws_server_handler.lock().await.broadcast(Message::text("Hello, world!")).await;
+        std::thread::sleep(std::time::Duration::from_secs(5));
+    }
 }
 
+// TODO: Implement checksum system
 fn unpack_client_files() -> Result<(), IoError> {
     let mut archive = ZipArchive::new(Cursor::new(CLIENT_FILES)).expect("Client files corrupted.");
 
@@ -41,11 +52,13 @@ fn unpack_client_files() -> Result<(), IoError> {
     Ok(())
 }
 
-async fn start_server() -> Sender<()> {
+async fn start_server(ws_server_handler: WsServerHandler) -> Sender<()> {
     let ws_server = warp::path("ws")
         .and(warp::ws())
-        .map(|ws: Ws| {
-            ws.on_upgrade(handle_socket)
+        .and(warp::addr::remote())
+        .and(warp::any().map(move || ws_server_handler.clone()))
+        .map(|ws: Ws, address: Option<SocketAddr>, ws_server_handler: WsServerHandler| {
+            ws.on_upgrade(move |socket| handle_socket(socket, address, ws_server_handler))
         });
     let index = warp::path::end().and(warp::fs::file("www/index.html"));
     let www = warp::fs::dir("www/").or(index);
@@ -63,10 +76,20 @@ async fn start_server() -> Sender<()> {
     shutdown_hook
 }
 
-async fn handle_socket(socket: WebSocket) {
-    let (tx, mut rx) = socket.split();
+async fn handle_socket(socket: WebSocket, address: Option<SocketAddr>, ws_server_handler: WsServerHandler) {
+    let (ws_tx, mut ws_rx) = socket.split();
+    let (tx, rx) = mpsc::unbounded::<Message>();
 
-    while let Some(result) = rx.next().await {
+    tokio::task::spawn(rx.map(|message| Ok(message)).forward(ws_tx));
+
+    let mut handler_guard = ws_server_handler.lock().await;
+    let id = handler_guard.add_client(tx, address);
+    let mut pipe = handler_guard.message_pipe();
+    drop(handler_guard);
+
+    println!("New client connected (ID {})", id);
+
+    while let Some(result) = ws_rx.next().await {
         let message = match result {
             Ok(message) => message,
             Err(e) => {
@@ -75,6 +98,11 @@ async fn handle_socket(socket: WebSocket) {
             }
         };
 
-        println!("{:?}", message);
+        if let Err(e) = pipe.send((id, message)).await {
+            eprintln!("Failed to pipe WS message to handler, {}", e);
+        }
     }
+
+    ws_server_handler.lock().await.remove_client(id);
+    println!("Client disconnected (ID {})", id);
 }
