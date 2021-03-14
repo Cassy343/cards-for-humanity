@@ -56,6 +56,7 @@ impl PackStore {
 
     /// Loads in a pack from json
     pub fn load_pack(&mut self, pack_name: &str) -> Result<PackHandle, String> {
+        let pack_name = &format!("{}.json", pack_name);
         if self.loaded_packs.contains_key(pack_name) {
             Ok(PackHandle {
                 pack: self.loaded_packs.get(pack_name).unwrap().clone(),
@@ -64,9 +65,9 @@ impl PackStore {
             })
         } else if self.possible_packs.contains(&pack_name.to_owned()) {
             let pack = if self.official_packs.contains(&pack_name.to_owned()) {
-                Self::read_pack(Path::new(&format!("{}/official/{}.json", self.pack_dir, pack_name)))?
+                Self::read_pack(Path::new(&format!("{}/official/{}", self.pack_dir, pack_name)))?
             } else {
-                Self::read_pack(Path::new(&format!("{}/custom/{}.json", self.pack_dir, pack_name)))?
+                Self::read_pack(Path::new(&format!("{}/custom/{}", self.pack_dir, pack_name)))?
             };
 
             self.loaded_packs
@@ -84,6 +85,7 @@ impl PackStore {
 
     /// Unloads a pack if no games are using it
     pub fn unload_pack(&mut self, pack_name: &str) {
+        let pack_name = &format!("{}.json", pack_name);
         if self.loaded_packs.contains_key(pack_name) {
             let pack = self.loaded_packs.get(pack_name).unwrap();
 
