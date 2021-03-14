@@ -28,6 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     zip_writer.finish()?;
 
+    println!("cargo:rerun-if-changed=../target/client-out/");
+    println!("cargo:rerun-if-changed=./www/");
     Ok(())
 }
 
