@@ -1,16 +1,10 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-    rc::{Rc, Weak},
-};
-
-use common::{Pack, Prompt, Response};
+use std::{collections::HashMap, convert::AsRef, fs, path::{Path, PathBuf}, rc::{Rc, Weak}};
+use common::data::cards::{Pack, Prompt, Response};
 use rand::Rng;
 
 /// A store to manage loading and unloading [Packs](Pack)
 pub struct PackStore {
-    pack_dir: String,
+    pack_dir: PathBuf,
     loaded_packs: HashMap<String, Rc<Pack>>,
     official_packs: Vec<String>,
     possible_packs: Vec<String>,
@@ -18,8 +12,10 @@ pub struct PackStore {
 
 impl PackStore {
     /// Creates a new PackStore
-    pub fn new(pack_dir: &str) -> std::io::Result<Self> {
-        let official_packs = fs::read_dir(&format!("{}/official/", pack_dir))?
+    pub fn new<P: AsRef<Path> + ?Sized>(pack_dir: &P) -> std::io::Result<Self> {
+        let pack_dir = pack_dir.as_ref();
+
+        let official_packs = fs::read_dir(&pack_dir.join("official"))?
             .filter_map(|e| {
                 if e.is_ok() {
                     if let Some(name) = e.unwrap().file_name().to_str() {
@@ -32,7 +28,7 @@ impl PackStore {
                 }
             })
             .collect::<Vec<_>>();
-        let custom_packs = fs::read_dir(&format!("{}/custom/", pack_dir))?
+        let custom_packs = fs::read_dir(&pack_dir.join("custom"))?
             .filter_map(|e| {
                 if e.is_ok() {
                     if let Some(name) = e.unwrap().file_name().to_str() {
@@ -70,15 +66,9 @@ impl PackStore {
             })
         } else if self.possible_packs.contains(&pack_name.to_owned()) {
             let pack = if self.official_packs.contains(&pack_name.to_owned()) {
-                Self::read_pack(Path::new(&format!(
-                    "{}/official/{}",
-                    self.pack_dir, pack_name
-                )))?
+                Self::read_pack(&self.official_dir().join(pack_name))?
             } else {
-                Self::read_pack(Path::new(&format!(
-                    "{}/custom/{}",
-                    self.pack_dir, pack_name
-                )))?
+                Self::read_pack(&self.custom_dir().join(pack_name))?
             };
 
             self.loaded_packs
@@ -116,7 +106,7 @@ impl PackStore {
         };
 
         match fs::write(
-            &format!("{}/custom/{}.json", self.pack_dir, pack_name),
+            self.custom_dir().join(&pack_name),
             json,
         ) {
             Ok(_) => {
@@ -134,6 +124,14 @@ impl PackStore {
         };
 
         serde_json::from_str::<Pack>(&json).map_err(|e| format!("Error deserializing pack: {}", e))
+    }
+
+    fn official_dir(&self) -> PathBuf {
+        self.pack_dir.join("official")
+    }
+
+    fn custom_dir(&self) -> PathBuf {
+        self.pack_dir.join("custom")
     }
 }
 

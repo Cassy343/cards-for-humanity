@@ -1,8 +1,15 @@
+use std::{env, fs::File, io::copy, path::Path, process::Command};
 use walkdir::WalkDir;
-use std::{env, path::Path, fs::File, io::copy};
 use zip::ZipWriter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    Command::new("wasm-pack")
+        .args(&["build", "../client/", "--target", "web", "--out-dir", "../target/client-out"])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("client.zip");
     let dest = File::create(dest_path)?;
@@ -30,12 +37,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     zip_writer.finish()?;
 
     println!("cargo:rerun-if-changed=../target/client-out/");
+    println!("cargo:rerun-if-changed=../client/");
     println!("cargo:rerun-if-changed=./www/");
     Ok(())
 }
 
-fn copy_client_file(zip_writer: &mut ZipWriter<File>, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn copy_client_file(
+    zip_writer: &mut ZipWriter<File>,
+    name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     zip_writer.start_file(&format!("www/client/{}", name), Default::default())?;
-    copy(&mut File::open(&format!("../target/client-out/{}", name))?, zip_writer)?;
+    copy(
+        &mut File::open(&format!("../target/client-out/{}", name))?,
+        zip_writer,
+    )?;
     Ok(())
 }
