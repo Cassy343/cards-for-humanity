@@ -10,17 +10,26 @@ common = {path = "../common"}
 serde = "1.0"
 js-sys = "0.3.48"
 wasm-bindgen = { version = "0.2.71", features = ["nightly"] }
-wee_alloc = "0.4.5"
+nalgebra = "0.25.3"
+
+[lib]
+crate-type =["cdylib"]
 
 [dependencies.web-sys]
 version = "0.3.48"
 features = [
-    "WebSocket",
-    "console",
-    "MessageEvent",
+    'Document',
+    'Element',
+    'HtmlCanvasElement',
+    'WebGlBuffer',
+    'WebGlRenderingContext',
+    'WebGlProgram',
+    'WebGlShader',
+    'Window',
+    'WebSocket',
+    'console',
+    'MessageEvent',
+    'WebGlUniformLocation',
     "CloseEvent",
     "ErrorEvent"
 ]
-
-[lib]
-crate-type =["cdylib"]
