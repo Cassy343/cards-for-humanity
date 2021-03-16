@@ -1,21 +1,18 @@
-//Version 432
-
 precision highp float;
 
-uniform vec4 vColor;
+varying vec2 point_coord;
 
-// uniform vec2 u_dimensions;
-// uniform float u_radius;
-// uniform int test;
+uniform vec4 color;
+uniform vec2 dimensions;
+uniform float corner_radius;
 
-void main(void){
-    // vec2 coords = 1.0 * u_dimensions;
-    // if(length(coords-vec2(0))<u_radius||
-    // length(coords-vec2(0,u_dimensions.y))<u_radius||
-    // length(coords-vec2(u_dimensions.x,0))<u_radius||
-    // length(coords-u_dimensions)<u_radius){
-    //     discard;
-    // }
-    // Do everything else otherwise
-    gl_FragColor=vColor;
+void main(void) {
+
+    vec2 pixel_vec = abs(point_coord * dimensions / 2.) - vec2((dimensions.x/2.0)-corner_radius,(dimensions.y/2.0)-corner_radius);
+
+    if(pixel_vec.x > 0.0 && pixel_vec.y > 0.0 && length(pixel_vec) > corner_radius) {
+        discard;
+    } else {
+        gl_FragColor=color;
+    }
 }

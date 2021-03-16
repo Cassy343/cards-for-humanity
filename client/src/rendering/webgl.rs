@@ -1,6 +1,13 @@
-use std::{collections::HashMap, ops::Mul};
+use std::{collections::HashMap};
 
-use nalgebra::{DMatrix, Matrix, Matrix2, Matrix3, Matrix4, Vector, Vector2, Vector3, Vector4, dimension::*, storage::Owned};
+use nalgebra::{
+    Matrix2,
+    Matrix3,
+    Matrix4,
+    Vector2,
+    Vector3,
+    Vector4,
+};
 
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{HtmlCanvasElement, WebGlProgram, WebGlRenderingContext, WebGlShader};
@@ -137,7 +144,7 @@ impl WebGLManager {
     }
 
     pub fn draw(&self, objects: Vec<&dyn Renderable>) -> Result<(), String> {
-        self.context.clear_color(1.0, 1.0, 1.0, 1.0);
+        self.context.clear_color(0.0, 0.0, 0.0, 1.0);
         self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
 
         for obj in objects {
@@ -161,7 +168,11 @@ impl WebGLManager {
         Ok(())
     }
 
-    fn register_attrs(&self, obj: &dyn Renderable, shader_program: &WebGlProgram) -> Result<(), String> {
+    fn register_attrs(
+        &self,
+        obj: &dyn Renderable,
+        shader_program: &WebGlProgram,
+    ) -> Result<(), String> {
         for attr in obj.attributes() {
             // Create and bind a new buffer to hold the attribute
             let buffer = self
@@ -182,11 +193,17 @@ impl WebGLManager {
         Ok(())
     }
 
-    fn register_uniforms(&self, obj: &dyn Renderable, shader_program: &WebGlProgram) -> Result<(), String> {
+    fn register_uniforms(
+        &self,
+        obj: &dyn Renderable,
+        shader_program: &WebGlProgram,
+    ) -> Result<(), String> {
         for uniform in obj.uniforms() {
-            let location_opt = self.context.get_uniform_location(shader_program, &uniform.name);
+            let location_opt = self
+                .context
+                .get_uniform_location(shader_program, &uniform.name);
             let location = location_opt.as_ref();
-            
+
             match uniform.kind {
                 UniformType::Int(v) => self.context.uniform1i(location, v),
                 UniformType::IVec2(v) => self.context.uniform2i(location, v.x, v.y),
@@ -196,9 +213,15 @@ impl WebGLManager {
                 UniformType::FVec2(v) => self.context.uniform2f(location, v.x, v.y),
                 UniformType::FVec3(v) => self.context.uniform3f(location, v.x, v.y, v.z),
                 UniformType::FVec4(v) => self.context.uniform4f(location, v.x, v.y, v.z, v.w),
-                UniformType::FMat2(v) => self.context.uniform_matrix2fv_with_f32_array(location, false, v.as_slice()),
-                UniformType::FMat3(v) => self.context.uniform_matrix3fv_with_f32_array(location, false, v.as_slice()),
-                UniformType::FMat4(v) => self.context.uniform_matrix4fv_with_f32_array(location, false, v.as_slice()),
+                UniformType::FMat2(v) =>
+                    self.context
+                        .uniform_matrix2fv_with_f32_array(location, false, v.as_slice()),
+                UniformType::FMat3(v) =>
+                    self.context
+                        .uniform_matrix3fv_with_f32_array(location, false, v.as_slice()),
+                UniformType::FMat4(v) =>
+                    self.context
+                        .uniform_matrix4fv_with_f32_array(location, false, v.as_slice()),
             }
         }
 
@@ -229,7 +252,7 @@ pub struct Attribute {
 
 pub struct Uniform {
     pub name: String,
-    pub kind: UniformType
+    pub kind: UniformType,
 }
 
 pub enum UniformType {
@@ -244,8 +267,4 @@ pub enum UniformType {
     FMat2(Matrix2<f32>),
     FMat3(Matrix3<f32>),
     FMat4(Matrix4<f32>),
-}
-
-pub trait Shape {
-    fn get_verts(&self, x: i32, y: i32) -> Vec<f32>;
 }
