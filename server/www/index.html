@@ -3,12 +3,13 @@
     <head>
         <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
         <title>Cards for Humanity</title>
+        <link rel="stylesheet" href="stylesheet.css">
     </head>
 
     <body>
-        <div style="position: relative;">
-            <canvas id="webgl" style="position: absolute;">Webgl Render Layer</canvas>
-            <canvas id="text" style="background-color: transparent; position: absolute;">Text Render Layer</canvas>
+        <div id="canvas-container">
+            <canvas id="webgl">Webgl Render Layer</canvas>
+            <canvas id="text">Text Render Layer</canvas>
         </div>
 
         <script type='module'>

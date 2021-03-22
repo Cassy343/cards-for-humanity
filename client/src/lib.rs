@@ -47,10 +47,10 @@ pub async fn render_test() -> Result<(), JsValue> {
     console_log!("making manager");
     manager.register_shader(
         "card",
-        &fetch("http://localhost:8080/shaders/card.vert")
+        &fetch("./shaders/card.vert")
             .await
             .expect("error getting shader"),
-        &fetch("http://localhost:8080/shaders/card.frag")
+        &fetch("./shaders/card.frag")
             .await
             .expect("error getting shader"),
         WebGlRenderingContext::TRIANGLE_STRIP,
@@ -101,7 +101,7 @@ pub async fn render_test() -> Result<(), JsValue> {
 async fn fetch(url: &str) -> Result<String, JsValue> {
     let mut options = RequestInit::new();
     options.method("GET");
-    options.mode(RequestMode::Cors);
+    options.mode(RequestMode::NoCors);
     let req = Request::new_with_str_and_init(url, &options)?;
 
     let window = web_sys::window().unwrap();

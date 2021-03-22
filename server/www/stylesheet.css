@@ -8,6 +8,16 @@ html, body {
     height: 100%;
 }
 
+#canvas-container {
+    display: block;
+    position: relative;
+}
+
 canvas {
     display: block;
+    position: absolute;
+}
+
+#text {
+    background-color: transparent;
 }
