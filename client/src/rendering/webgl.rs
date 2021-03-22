@@ -1,21 +1,18 @@
-use std::{collections::HashMap};
-
-use nalgebra::{
-    Matrix2,
-    Matrix3,
-    Matrix4,
-    Vector2,
-    Vector3,
-    Vector4,
+use std::{
+    collections::HashMap,
+    ops::{Mul},
 };
+
+use nalgebra::{Matrix2, Matrix2xX, Matrix3, Matrix4, Vector2, Vector3, Vector4};
 
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{HtmlCanvasElement, WebGlProgram, WebGlRenderingContext, WebGlShader};
 
-pub struct WebGLManager {
-    canvas: HtmlCanvasElement,
+use crate::console_log;
+
+pub struct WebGlManager {
     context: WebGlRenderingContext,
-    shaders: HashMap<String, WebGlProgram>,
+    shaders: HashMap<String, (WebGlProgram, u32)>,
 }
 
 macro_rules! attr_load {
@@ -57,17 +54,16 @@ macro_rules! attr_load {
 }
 
 
-impl WebGLManager {
-    pub fn new(canvas: HtmlCanvasElement) -> Result<Self, JsValue> {
-        let context = canvas
-            .get_context("webgl")?
-            .unwrap()
-            .dyn_into::<WebGlRenderingContext>()?;
+impl WebGlManager {
+    pub fn new(
+        webgl_canvas: &HtmlCanvasElement,
+    ) -> Result<Self, JsValue> {
+        let context = webgl_canvas.get_context("webgl")?.unwrap().dyn_into()?;
 
-        Ok(Self {
-            canvas,
+
+        Ok(WebGlManager {
             context,
-            shaders: HashMap::new(),
+            shaders: HashMap::new()
         })
     }
 
@@ -76,6 +72,7 @@ impl WebGLManager {
         shader_name: &str,
         vert_src: &str,
         frag_src: &str,
+        render_type: u32,
     ) -> Result<(), String> {
         if !self.shaders.contains_key(shader_name) {
             let vert = self.compile_shader(WebGlRenderingContext::VERTEX_SHADER, vert_src)?;
@@ -83,7 +80,8 @@ impl WebGLManager {
 
             let program = self.link_program(&vert, &frag)?;
 
-            self.shaders.insert(shader_name.to_owned(), program);
+            self.shaders
+                .insert(shader_name.to_owned(), (program, render_type));
 
             Ok(())
         } else {
@@ -143,37 +141,66 @@ impl WebGLManager {
         }
     }
 
-    pub fn draw(&self, objects: Vec<&dyn Renderable>) -> Result<(), String> {
-        self.context.clear_color(0.0, 0.0, 0.0, 1.0);
-        self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
-
-        for obj in objects {
-            self.draw_object(obj)?;
-        }
-
-        Ok(())
+    pub fn set_clear_color(&self, r: f32, g: f32, b: f32) {
+        self.context.clear_color(r, g, b, 1.0);
     }
 
-    fn draw_object(&self, obj: &dyn Renderable) -> Result<(), String> {
+    pub fn clear(&self) {
+        self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
+    }
+
+    pub fn clear_rect(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.context.enable(WebGlRenderingContext::SCISSOR_TEST);
+        self.context.scissor(x, y, width, height);
+        self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
+    }
+
+    pub fn draw_object(&self, obj: &dyn WebGLRenderable) -> Result<(), String> {
         let shader_name = obj.shader();
-        let shader_program = self.shaders.get(&shader_name).unwrap();
+        let (shader_program, render_type) = self.shaders.get(&shader_name).unwrap();
 
         self.context.use_program(Some(shader_program));
-        self.register_uniforms(obj, shader_program)?;
-        self.register_attrs(obj, shader_program)?;
+
+        let mut uniforms = obj.uniforms();
+
+        uniforms.push(Uniform {
+            name: "position".to_owned(),
+            kind: UniformType::FVec2(obj.position().component_div(&Vector2::from(super::BASE_RESOLUTION))),
+        });
+
+        self.register_uniforms(&uniforms, shader_program);
+
+        let mut attrs = obj.attributes();
+
+        let vertexes = obj.vertexes();
+        let scale = obj.scale();
+
+        let combined_scale = scale.component_div(&Vector2::from(super::BASE_RESOLUTION));
+
+        let output = Matrix2::new(combined_scale.x, 0.0, 0.0, combined_scale.y).mul(&vertexes);
+
+        console_log!("{} {} {} {}", vertexes, scale, combined_scale, output);
+
+        attrs.push(Attribute {
+            name: "vertex".to_owned(),
+            vec_size: 2,
+            kind: AttributeType::Float(output.as_slice().to_vec()),
+        });
+
+        self.register_attrs(&attrs, shader_program)?;
 
         self.context
-            .draw_arrays(obj.render_type(), 0, obj.num_elements());
+            .draw_arrays(*render_type, 0, obj.vertexes().len() as i32 / 2);
 
         Ok(())
     }
 
     fn register_attrs(
         &self,
-        obj: &dyn Renderable,
+        attrs: &Vec<Attribute>,
         shader_program: &WebGlProgram,
     ) -> Result<(), String> {
-        for attr in obj.attributes() {
+        for attr in attrs {
             // Create and bind a new buffer to hold the attribute
             let buffer = self
                 .context
@@ -193,12 +220,8 @@ impl WebGLManager {
         Ok(())
     }
 
-    fn register_uniforms(
-        &self,
-        obj: &dyn Renderable,
-        shader_program: &WebGlProgram,
-    ) -> Result<(), String> {
-        for uniform in obj.uniforms() {
+    fn register_uniforms(&self, uniforms: &Vec<Uniform>, shader_program: &WebGlProgram) {
+        for uniform in uniforms {
             let location_opt = self
                 .context
                 .get_uniform_location(shader_program, &uniform.name);
@@ -224,18 +247,20 @@ impl WebGLManager {
                         .uniform_matrix4fv_with_f32_array(location, false, v.as_slice()),
             }
         }
-
-        Ok(())
     }
 }
-pub trait Renderable {
+
+pub trait WebGLRenderable {
+    // Use vec instead of Matrix because we don't know the size and DMatrix is hell
+    fn vertexes(&self) -> Matrix2xX<f32>;
+    fn position(&self) -> Vector2<f32>;
     fn attributes(&self) -> Vec<Attribute>;
     fn uniforms(&self) -> Vec<Uniform>;
     fn shader(&self) -> String;
-    fn render_type(&self) -> u32;
-    fn num_elements(&self) -> i32;
+    fn scale(&self) -> Vector2<f32>;
 }
 
+#[allow(dead_code)]
 pub enum AttributeType {
     Byte(Vec<i8>),
     Short(Vec<i16>),
@@ -255,6 +280,7 @@ pub struct Uniform {
     pub kind: UniformType,
 }
 
+#[allow(dead_code)]
 pub enum UniformType {
     Int(i32),
     IVec2(Vector2<i32>),

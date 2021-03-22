@@ -6,75 +6,114 @@ mod ws;
 #[macro_use]
 mod console;
 
-
-
-use nalgebra::{Vector2, Vector3};
-use rendering::{shapes::RoundedRect, webgl::{Renderable, WebGLManager}};
+use nalgebra::{Vector2};
+use rendering::{Color, RenderManager, Renderable, shapes::{RoundedRect, Text, TextBubble}};
 use wasm_bindgen::{prelude::*, JsCast};
+use wasm_bindgen_futures::*;
+use web_sys::{Request, RequestInit, RequestMode, Response, WebGlRenderingContext};
 use ws::WebSocket;
 
 #[wasm_bindgen]
 pub fn client_main() {
-    let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    spawn_local(async {
+        let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
 
-    socket.onopen(|socket| {
-        console_log!("Socket opened");
-        let _ = socket.send_packet(&common::protocol::serverbound::ServerBoundPacket::StartGame);
-    });
-    socket.onmessage(|_socket, event| console_log!("{:?}", event.data()));
-    socket.onclose(|_socket, event| console_log!("{:?}", event));
-    socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
+        socket.onopen(|socket| {
+            console_log!("Socket opened");
+            let _ =
+                socket.send_packet(&common::protocol::serverbound::ServerBoundPacket::StartGame);
+        });
+        socket.onmessage(|_socket, event| console_log!("{:?}", event.data()));
+        socket.onclose(|_socket, event| console_log!("{:?}", event));
+        socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
 
-    render_test().unwrap();
+        render_test().await.unwrap();
+    })
 }
 
 
-pub fn render_test() -> Result<(), JsValue> {
+pub async fn render_test() -> Result<(), JsValue> {
     console_log!("Running the render test");
-    let document = web_sys::window().unwrap().document().unwrap();
-    let canvas = document.get_element_by_id("canvas").unwrap();
-    let canvas: web_sys::HtmlCanvasElement = canvas.dyn_into::<web_sys::HtmlCanvasElement>()?;
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
+    let webgl_canvas = document.get_element_by_id("webgl").unwrap();
+    let webgl_canvas: web_sys::HtmlCanvasElement = webgl_canvas.dyn_into()?;
+    let text_canvas = document.get_element_by_id("text").unwrap();
+    let text_canvas: web_sys::HtmlCanvasElement = text_canvas.dyn_into()?;
 
-    let mut manager = WebGLManager::new(canvas)?;
+    let mut manager = RenderManager::new(&webgl_canvas, &text_canvas)?;
 
     console_log!("making manager");
     manager.register_shader(
         "card",
-        include_str!("./shaders/card.vert"),
-        include_str!("./shaders/card.frag"),
+        &fetch("http://localhost:8080/shaders/card.vert")
+            .await
+            .expect("error getting shader"),
+        &fetch("http://localhost:8080/shaders/card.frag")
+            .await
+            .expect("error getting shader"),
+        WebGlRenderingContext::TRIANGLE_STRIP,
     )?;
 
     let mut objects: Vec<&dyn Renderable> = Vec::new();
 
-    let mut rect = RoundedRect { 
-        position: Vector2::new(0.5, 0.0), 
-        dimensions: Vector2::new(1.0, 0.5), 
-        color: Vector3::new(1.0, 0.0, 1.0), 
-        radius: 0.125
+    let rect = RoundedRect {
+        position: Vector2::new(0.0, 0.0),
+        dimensions: Vector2::new(500.0, 500.0),
+        color: Color::from_rgb(0xfa, 0x10, 0xaa),
+        radius: 0.125,
     };
 
-    objects.push(&rect);
+    let text_bubble = TextBubble {
+        text: Text {
+            text: "This is a multiline\npiece of text!".to_owned(),
+            text_pos: rect.position,
+            width: None,
+            font: "Comic Sans MS".to_owned(),
+            font_size: 50,
+            fill_style: "Black".to_owned(),
+            outline: false
+        },
+        rect,
+    };
 
-    manager.draw(objects)?;
+    objects.push(&text_bubble);
 
-    console_log!("registering set timeout");
-    let func = Closure::<dyn FnMut()>::new(move || {
-        rect.test();
+    manager.draw_objects(objects)?;
 
+    let resize_callback = Closure::<dyn FnMut()>::new(move || {
+        manager.clear();
         let mut objects: Vec<&dyn Renderable> = Vec::new();
-        objects.push(&rect);
-        manager.draw(objects).unwrap();
+        objects.push(&text_bubble);
+        manager.update_scale_factor();
+        manager.draw_objects(objects).unwrap();
     });
 
-    web_sys::window()
-        .unwrap()
-        .set_timeout_with_callback_and_timeout_and_arguments_0(
-            func.as_ref().unchecked_ref(),
-            1000,
-        )?;
+    window.add_event_listener_with_callback("resize", resize_callback.as_ref().unchecked_ref())?;
 
-    func.forget();
+    resize_callback.forget();
 
     console_log!("returning");
     Ok(())
+}
+
+async fn fetch(url: &str) -> Result<String, JsValue> {
+    let mut options = RequestInit::new();
+    options.method("GET");
+    options.mode(RequestMode::Cors);
+    let req = Request::new_with_str_and_init(url, &options)?;
+
+    let window = web_sys::window().unwrap();
+    let request_promise = window.fetch_with_request(&req);
+    let future = JsFuture::from(request_promise);
+
+    let response = future.await?;
+    let response: Response = response.dyn_into()?;
+
+    let text_future = JsFuture::from(response.text()?);
+    let text = text_future.await?;
+    Ok(text
+        .as_string()
+        .expect("Response.text() did not return a String and did not error"))
 }

@@ -1,3 +1,4 @@
+#[macro_export]
 macro_rules! console_log {
     () => {
         ::web_sys::console::log_0()
@@ -7,6 +8,7 @@ macro_rules! console_log {
     };
 }
 
+#[macro_export]
 macro_rules! console_warn {
     () => {
         ::web_sys::console::warn_0()
@@ -16,6 +18,7 @@ macro_rules! console_warn {
     };
 }
 
+#[macro_export]
 macro_rules! console_error {
     () => {
         ::web_sys::console::error_0()

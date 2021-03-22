@@ -6,11 +6,26 @@
     </head>
 
     <body>
-        It works!
-        <canvas id="canvas"></canvas>
+        <div style="position: relative;">
+            <canvas id="webgl" style="position: absolute;">Webgl Render Layer</canvas>
+            <canvas id="text" style="background-color: transparent; position: absolute;">Text Render Layer</canvas>
+        </div>
 
         <script type='module'>
             import init, { client_main } from './client/client.js';
+
+            let webgl_canvas = document.getElementById('webgl');
+            let text_canvas = document.getElementById('text');
+
+            // resize the canvas to fill browser window dynamically
+            window.addEventListener('resize', resizeCanvas, false);
+            function resizeCanvas() {
+                webgl_canvas.width = window.innerWidth;
+                webgl_canvas.height = window.innerHeight;
+                text_canvas.width = window.innerWidth;
+                text_canvas.height = window.innerHeight;
+            }
+            resizeCanvas()
 
             async function run() {
                 await init(new URL('./client/client_bg.wasm', import.meta.url));

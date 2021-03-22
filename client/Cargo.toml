@@ -11,6 +11,8 @@ serde = "1.0"
 js-sys = "0.3.48"
 wasm-bindgen = { version = "0.2.71", features = ["nightly"] }
 nalgebra = "0.25.3"
+wasm-bindgen-futures = "0.4.22"
+console_error_panic_hook = "0.1.6"
 
 [lib]
 crate-type =["cdylib"]
@@ -31,5 +33,13 @@ features = [
     'MessageEvent',
     'WebGlUniformLocation',
     "CloseEvent",
-    "ErrorEvent"
+    "ErrorEvent",
+    'CanvasRenderingContext2d',
+    'CanvasGradient',
+    'TextMetrics',
+    'Response',
+    'Request',
+    'RequestInit',
+    'RequestMode',
+    'EventTarget'
 ]
