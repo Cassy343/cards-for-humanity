@@ -7,6 +7,8 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use warp::ws::{Message, WebSocket};
 use log::{debug, error};
+use serde::Serialize;
+use common::protocol::encode;
 
 pub struct ClientHandler {
     client_list: HashMap<usize, Client>,
@@ -37,16 +39,43 @@ impl ClientHandler {
         address: Option<SocketAddr>,
     ) -> usize {
         let id = self.client_id;
-        self.client_list.insert(id, Client::new(conn, address));
+        self.client_list.insert(id, Client::new(id, conn, address));
         self.client_id += 1;
         id
+    }
+
+    pub fn get_client(&self, client_id: usize) -> Option<&Client> {
+        self.client_list.get(&client_id)
+    }
+
+    pub fn get_client_mut(&mut self, client_id: usize) -> Option<&mut Client> {
+        self.client_list.get_mut(&client_id)
     }
 
     pub fn remove_client(&mut self, id: usize) -> Option<Client> {
         self.client_list.remove(&id)
     }
 
-    pub async fn broadcast(&mut self, message: Message) {
+    pub async fn send_packet<P: Serialize>(&mut self, client_id: usize, packet: &P) -> Option<Result<(), SendError>> {
+        Some(self.get_client_mut(client_id)?.send(Message::text(encode(packet))).await)
+    }
+
+    pub async fn broadcast<P, F, E>(&mut self, packet: &P, mut filter: F, mut on_error: E)
+    where
+        P: Serialize,
+        F: FnMut(&Client) -> bool,
+        E: FnMut(&Client)
+    {
+        let encoded = encode(packet);
+        for client in self.client_list.values_mut().filter(|client| filter(client)) {
+            match client.send(Message::text(encoded.clone())).await {
+                Err(_) => on_error(client),
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn broadcast_all(&mut self, message: Message) {
         for client in self.client_list.values_mut() {
             // TODO: better error handling?
             let _ = client.send(message.clone()).await;
@@ -90,16 +119,22 @@ impl ClientHandler {
 }
 
 pub struct Client {
+    id: usize,
     connection: UnboundedSender<Message>,
     address: Option<SocketAddr>,
 }
 
 impl Client {
-    pub fn new(connection: UnboundedSender<Message>, address: Option<SocketAddr>) -> Self {
+    pub fn new(id: usize, connection: UnboundedSender<Message>, address: Option<SocketAddr>) -> Self {
         Client {
+            id,
             connection,
             address,
         }
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     pub async fn send(&mut self, message: Message) -> Result<(), SendError> {

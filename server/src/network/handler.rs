@@ -80,7 +80,7 @@ impl NetworkHandler {
             None => return
         }
 
-        self.client_handler.lock().await.broadcast(Message::close()).await;
+        self.client_handler.lock().await.broadcast_all(Message::close()).await;
         self.listeners.clear();
     }
 }

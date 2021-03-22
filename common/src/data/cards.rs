@@ -11,8 +11,8 @@ use serde::{
 pub struct Pack {
     pub name: String,
     pub official: bool,
-    #[serde(rename = "white")]
     #[serde(
+        rename = "white",
         deserialize_with = "deserialize_response",
         serialize_with = "serialize_response"
     )]

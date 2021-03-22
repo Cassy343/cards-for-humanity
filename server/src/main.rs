@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client_handler = Arc::new(Mutex::new(raw_ch));
     let server_shutdown_hook = start_server(client_handler.clone()).await;
     let mut network_handler = NetworkHandler::new(client_handler, incoming_messages, server_shutdown_hook);
-    network_handler.add_listener(game::Game);
+    network_handler.add_listener(game::Game::new());
 
     loop {
         // Check for a new command every 50ms

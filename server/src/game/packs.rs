@@ -12,7 +12,7 @@ pub struct PackStore {
 
 impl PackStore {
     /// Creates a new PackStore
-    pub fn new<P: AsRef<Path> + ?Sized>(pack_dir: &P) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(pack_dir: P) -> std::io::Result<Self> {
         let pack_dir = pack_dir.as_ref();
 
         let official_packs = fs::read_dir(&pack_dir.join("official"))?
@@ -56,15 +56,11 @@ impl PackStore {
     }
 
     /// Loads in a pack from json
-    pub fn load_pack(&mut self, pack_name: &str) -> Result<PackHandle, String> {
+    pub fn load_pack(&mut self, pack_name: &str) -> Result<Rc<Pack>, String> {
         let pack_name = &format!("{}.json", pack_name);
         if self.loaded_packs.contains_key(pack_name) {
-            Ok(PackHandle {
-                pack: self.loaded_packs.get(pack_name).unwrap().clone(),
-                used_prompts: Vec::new(),
-                used_responses: Vec::new(),
-            })
-        } else if self.possible_packs.contains(&pack_name.to_owned()) {
+            Ok(self.loaded_packs.get(pack_name).unwrap().clone())
+        } else if self.possible_packs.contains(pack_name) {
             let pack = if self.official_packs.contains(&pack_name.to_owned()) {
                 Self::read_pack(&self.official_dir().join(pack_name))?
             } else {
@@ -74,11 +70,7 @@ impl PackStore {
             self.loaded_packs
                 .insert(pack_name.to_owned(), Rc::new(pack));
 
-            Ok(PackHandle {
-                pack: self.loaded_packs.get(pack_name).unwrap().clone(),
-                used_prompts: Vec::new(),
-                used_responses: Vec::new(),
-            })
+            Ok(self.loaded_packs.get(pack_name).unwrap().clone())
         } else {
             Err(format!("Pack {} is not found", pack_name))
         }
@@ -132,55 +124,5 @@ impl PackStore {
 
     fn custom_dir(&self) -> PathBuf {
         self.pack_dir.join("custom")
-    }
-}
-
-pub struct PackHandle {
-    pack: Rc<Pack>,
-    used_prompts: Vec<usize>,
-    used_responses: Vec<usize>,
-}
-
-impl PackHandle {
-    pub fn pack(&self) -> Weak<Pack> {
-        Rc::downgrade(&self.pack)
-    }
-
-    /// Get a random prompt from the pack
-    pub fn get_prompt(&mut self) -> &Prompt {
-        let mut rng = rand::thread_rng();
-
-        let mut index: usize;
-
-        loop {
-            index = rng.gen_range(0 .. self.pack.prompts.len());
-
-            if !self.used_prompts.contains(&index) {
-                break;
-            }
-        }
-
-        // Unwrap is safe cause we only have indexes in bounds
-        self.used_prompts.push(index);
-        self.pack.prompts.get(index).unwrap()
-    }
-
-    /// Get a random response from the pack
-    pub fn get_response(&mut self) -> &Response {
-        let mut rng = rand::thread_rng();
-
-        let mut index: usize;
-
-        loop {
-            index = rng.gen_range(0 .. self.pack.responses.len());
-
-            if !self.used_responses.contains(&index) {
-                break;
-            }
-        }
-
-        // Unwrap is safe cause we only have indexes in bounds
-        self.used_responses.push(index);
-        self.pack.responses.get(index).unwrap()
     }
 }
