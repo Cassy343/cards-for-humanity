@@ -56,12 +56,15 @@ pub async fn render_test() -> Result<(), JsValue> {
         WebGlRenderingContext::TRIANGLE_STRIP,
     )?;
 
+    manager.set_background_color(Color::from_rgb(0x1e, 0x34, 0x54));
+    manager.clear();
+
     let mut objects: Vec<&dyn Renderable> = Vec::new();
 
     let rect = RoundedRect {
         position: Vector2::new(0.0, 0.0),
         dimensions: Vector2::new(500.0, 500.0),
-        color: Color::from_rgb(0xfa, 0x10, 0xaa),
+        color: Color::from_rgb(0xff, 0xff, 0xff),
         radius: 0.125,
     };
 

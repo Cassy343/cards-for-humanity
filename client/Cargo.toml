@@ -9,7 +9,7 @@ edition = "2018"
 common = {path = "../common"}
 serde = "1.0"
 js-sys = "0.3.48"
-wasm-bindgen = { version = "0.2.71", features = ["nightly"] }
+wasm-bindgen = { version = "0.2.72", features = ["nightly", "serde-serialize"] }
 nalgebra = "0.25.3"
 wasm-bindgen-futures = "0.4.22"
 console_error_panic_hook = "0.1.6"
@@ -25,6 +25,7 @@ features = [
     'HtmlCanvasElement',
     'WebGlBuffer',
     'WebGlRenderingContext',
+    'WebGl2RenderingContext',
     'WebGlProgram',
     'WebGlShader',
     'Window',

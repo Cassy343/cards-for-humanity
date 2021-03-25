@@ -1,18 +1,17 @@
-use std::{
-    collections::HashMap,
-    ops::{Mul},
-};
+use std::{collections::HashMap, ops::{Mul}};
 
 use nalgebra::{Matrix2, Matrix2xX, Matrix3, Matrix4, Vector2, Vector3, Vector4};
 
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{HtmlCanvasElement, WebGlProgram, WebGlRenderingContext, WebGlShader};
+use web_sys::{HtmlCanvasElement, WebGlProgram, WebGl2RenderingContext, WebGlShader};
+use serde::Serialize;
 
 use crate::console_log;
 
 pub struct WebGlManager {
-    context: WebGlRenderingContext,
+    context: WebGl2RenderingContext,
     shaders: HashMap<String, (WebGlProgram, u32)>,
+    aspect_ratio: Vector2<f32>
 }
 
 macro_rules! attr_load {
@@ -25,9 +24,9 @@ macro_rules! attr_load {
                 unsafe {
                     let arr = js_sys::$js_type::view(values.iter().map(|b|*b).collect::<Vec<_>>().as_slice());
                     $self.context.buffer_data_with_array_buffer_view(
-                        WebGlRenderingContext::ARRAY_BUFFER,
+                        WebGl2RenderingContext::ARRAY_BUFFER,
                         &arr,
-                        WebGlRenderingContext::STATIC_DRAW
+                        WebGl2RenderingContext::STATIC_DRAW
                     );
                 }
 
@@ -38,7 +37,7 @@ macro_rules! attr_load {
                 $self.context.vertex_attrib_pointer_with_i32(
                     attr_index as u32,
                     $attr.vec_size as i32,
-                    WebGlRenderingContext::$web_gl,
+                    WebGl2RenderingContext::$web_gl,
                     false,
                     0,
                     0
@@ -53,17 +52,35 @@ macro_rules! attr_load {
     };
 }
 
+#[derive(Serialize)]
+struct ContextOptions {
+    antialias: bool
+}
+
 
 impl WebGlManager {
     pub fn new(
         webgl_canvas: &HtmlCanvasElement,
+        canvas_size: Vector2<f32>
     ) -> Result<Self, JsValue> {
-        let context = webgl_canvas.get_context("webgl")?.unwrap().dyn_into()?;
+        let context :WebGl2RenderingContext = webgl_canvas
+            .get_context_with_context_options(
+                "webgl2", 
+                &JsValue::from_serde(
+                    &ContextOptions {antialias: true})
+                .expect("Error serializing webgl2 context options"))?
+            .unwrap().dyn_into()?;
+
+        context.enable(WebGl2RenderingContext::BLEND);
+        context.enable(WebGl2RenderingContext::SAMPLE_COVERAGE);
+        context.enable(WebGl2RenderingContext::SAMPLE_ALPHA_TO_COVERAGE);
+        // context.sample_coverage(0.5, false);
 
 
         Ok(WebGlManager {
             context,
-            shaders: HashMap::new()
+            shaders: HashMap::new(),
+            aspect_ratio: Vector2::new(canvas_size.x / canvas_size.y, canvas_size.y / canvas_size.x)
         })
     }
 
@@ -75,8 +92,8 @@ impl WebGlManager {
         render_type: u32,
     ) -> Result<(), String> {
         if !self.shaders.contains_key(shader_name) {
-            let vert = self.compile_shader(WebGlRenderingContext::VERTEX_SHADER, vert_src)?;
-            let frag = self.compile_shader(WebGlRenderingContext::FRAGMENT_SHADER, frag_src)?;
+            let vert = self.compile_shader(WebGl2RenderingContext::VERTEX_SHADER, vert_src)?;
+            let frag = self.compile_shader(WebGl2RenderingContext::FRAGMENT_SHADER, frag_src)?;
 
             let program = self.link_program(&vert, &frag)?;
 
@@ -99,7 +116,7 @@ impl WebGlManager {
 
         if self
             .context
-            .get_shader_parameter(&shader, WebGlRenderingContext::COMPILE_STATUS)
+            .get_shader_parameter(&shader, WebGl2RenderingContext::COMPILE_STATUS)
             .as_bool()
             .unwrap_or(false)
         {
@@ -128,7 +145,7 @@ impl WebGlManager {
 
         if self
             .context
-            .get_program_parameter(&program, WebGlRenderingContext::LINK_STATUS)
+            .get_program_parameter(&program, WebGl2RenderingContext::LINK_STATUS)
             .as_bool()
             .unwrap_or(false)
         {
@@ -146,13 +163,13 @@ impl WebGlManager {
     }
 
     pub fn clear(&self) {
-        self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
+        self.context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
     }
 
     pub fn clear_rect(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.context.enable(WebGlRenderingContext::SCISSOR_TEST);
+        self.context.enable(WebGl2RenderingContext::SCISSOR_TEST);
         self.context.scissor(x, y, width, height);
-        self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
+        self.context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
     }
 
     pub fn draw_object(&self, obj: &dyn WebGLRenderable) -> Result<(), String> {
@@ -166,6 +183,13 @@ impl WebGlManager {
         uniforms.push(Uniform {
             name: "position".to_owned(),
             kind: UniformType::FVec2(obj.position().component_div(&Vector2::from(super::BASE_RESOLUTION))),
+        });
+
+        console_log!("{}", self.aspect_ratio);
+
+        uniforms.push(Uniform {
+            name: "aspect_ratio".to_owned(),
+            kind: UniformType::Float(self.aspect_ratio.x)
         });
 
         self.register_uniforms(&uniforms, shader_program);
@@ -207,7 +231,7 @@ impl WebGlManager {
                 .create_buffer()
                 .ok_or("failed to create buffer")?;
             self.context
-                .bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
+                .bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
 
             attr_load!(self, attr, shader_program,
                 Byte, Int8Array, BYTE;

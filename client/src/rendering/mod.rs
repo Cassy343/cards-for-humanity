@@ -11,6 +11,20 @@ pub struct Color {
     inner: Vector3<f32>
 }
 
+macro_rules! rgb_get {
+    ($($fn_name: ident, $fn_name2: ident, $corresponding: ident),*) => {
+        $(
+            pub fn $fn_name(&self) -> f32 {
+                self.inner.$corresponding
+            }
+
+            pub fn $fn_name2(&self) -> u8 {
+                (self.inner.$corresponding * 256.0) as u8
+            }
+        )*
+    };
+}
+
 #[allow(dead_code)]
 impl Color {
     pub fn from_hex_str(str: &str) -> Result<Color, ParseIntError> {
@@ -38,4 +52,6 @@ impl Color {
     pub fn to_rgb(&self) -> Vector3<u8> {
         self.inner.map(|f | (f * 256.0) as u8)
     }
+
+    rgb_get!{r, r_int, x, g, g_int, y, b, b_int, z}
 }
