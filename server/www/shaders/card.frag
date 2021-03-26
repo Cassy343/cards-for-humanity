@@ -6,6 +6,7 @@ uniform vec4 color;
 uniform vec2 dimensions;
 uniform float corner_radius;
 uniform float aspect_ratio;
+uniform vec2 canvans_dimensions;
 
 void main(void) {
     vec2 pixel_vec = abs(point_coord) - vec2((dimensions.x / 2.) - corner_radius / aspect_ratio, (dimensions.y / 2.) - corner_radius);

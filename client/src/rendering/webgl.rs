@@ -11,6 +11,7 @@ use crate::console_log;
 pub struct WebGlManager {
     context: WebGl2RenderingContext,
     shaders: HashMap<String, (WebGlProgram, u32)>,
+    canvas_size: Vector2<f32>,
     aspect_ratio: Vector2<f32>,
 }
 
@@ -81,6 +82,7 @@ impl WebGlManager {
         Ok(WebGlManager {
             context,
             shaders: HashMap::new(),
+            canvas_size,
             aspect_ratio: Vector2::new(
                 canvas_size.x / canvas_size.y,
                 canvas_size.y / canvas_size.x,
@@ -197,6 +199,11 @@ impl WebGlManager {
         uniforms.push(Uniform {
             name: "aspect_ratio".to_owned(),
             kind: UniformType::Float(self.aspect_ratio.x),
+        });
+
+        uniforms.push(Uniform {
+            name: "canvas_dimensions".to_owned(),
+            kind: UniformType::FVec2(self.canvas_size)
         });
 
         self.register_uniforms(&uniforms, shader_program);
