@@ -6,7 +6,7 @@ uniform vec4 color;
 uniform vec2 dimensions;
 uniform float corner_radius;
 uniform float aspect_ratio;
-uniform vec2 canvans_dimensions;
+uniform vec2 canvas_dimensions;
 
 void main(void) {
     vec2 pixel_vec = abs(point_coord) - vec2((dimensions.x / 2.) - corner_radius / aspect_ratio, (dimensions.y / 2.) - corner_radius);
@@ -14,8 +14,10 @@ void main(void) {
 
     if (pixel_vec.x > 0. && pixel_vec.y > 0.) {
         float alpha;
-        if (length(pixel_vec) > corner_radius) {
-            alpha = 1. - clamp((length(pixel_vec) - corner_radius) * 250., 0., 1.);
+        float pixel_vec_len = length(pixel_vec);
+
+        if (pixel_vec_len > corner_radius) {
+            alpha = 1. - clamp((length(pixel_vec) - corner_radius) * canvas_dimensions.y / 2., 0., 1.);
         } else {
             alpha = 1.;
         }
