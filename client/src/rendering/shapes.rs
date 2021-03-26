@@ -1,7 +1,7 @@
 use nalgebra::{Matrix2xX, Vector2, Vector4};
 use wasm_bindgen::JsCast;
 
-use super::{Color, ExtendedTextMetrics, RenderManager, Renderable, webgl::*};
+use super::{webgl::*, Color, ExtendedTextMetrics, RenderManager, Renderable};
 
 use crate::console_log;
 
@@ -50,7 +50,7 @@ impl Renderable for Meme {
 
 pub struct TextBubble {
     pub rect: RoundedRect,
-    pub text: Text
+    pub text: Text,
 }
 
 impl Renderable for TextBubble {
@@ -75,21 +75,27 @@ impl Renderable for Text {
         render_manager.set_font(&format!("{}px {}", self.font_size, self.font));
         render_manager.set_fill_style(&self.fill_style);
 
-        
+
         let line_count = self.text.lines().count() - 1;
         let lines = self.text.split('\n').enumerate();
-        
+
         for (line_num, line_text) in lines {
-            let text_metrics: ExtendedTextMetrics = render_manager
-                .get_text_spacing(line_text)?
-                .unchecked_into();
+            let text_metrics: ExtendedTextMetrics =
+                render_manager.get_text_spacing(line_text)?.unchecked_into();
             let text_spacing_left = text_metrics.actual_bounding_box_left();
             let text_spacing_right = text_metrics.actual_bounding_box_right();
 
-            let adjust_val = self.font_size as f32 * 2.0
-                * -((line_count as f32 / 2.0) - line_num as f32);
+            let adjust_val =
+                self.font_size as f32 * 2.0 * -((line_count as f32 / 2.0) - line_num as f32);
 
-            console_log!("{} {} {} {} {}", line_num, line_count, self.text_pos.y, ((line_count as f32 / 2.0) - line_num as f32), adjust_val);
+            console_log!(
+                "{} {} {} {} {}",
+                line_num,
+                line_count,
+                self.text_pos.y,
+                ((line_count as f32 / 2.0) - line_num as f32),
+                adjust_val
+            );
 
             if self.outline {
                 render_manager.draw_text_outline(
@@ -130,16 +136,15 @@ impl WebGLRenderable for RoundedRect {
         vec![
             Uniform {
                 name: "color".to_owned(),
-                kind: UniformType::FVec4(Vector4::new(
-                    color.x,
-                    color.y,
-                    color.z,
-                    1.0,
-                )),
+                kind: UniformType::FVec4(Vector4::new(color.x, color.y, color.z, 1.0)),
             },
             Uniform {
                 name: "dimensions".to_owned(),
-                kind: UniformType::FVec2(self.dimensions.component_div(&Vector2::from(super::BASE_RESOLUTION)) * 2.0),
+                kind: UniformType::FVec2(
+                    self.dimensions
+                        .component_div(&Vector2::from(super::BASE_RESOLUTION))
+                        * 2.0,
+                ),
             },
             Uniform {
                 name: "corner_radius".to_owned(),

@@ -6,8 +6,13 @@ mod ws;
 #[macro_use]
 mod console;
 
-use nalgebra::{Vector2};
-use rendering::{Color, RenderManager, Renderable, shapes::{RoundedRect, Text, TextBubble}};
+use nalgebra::Vector2;
+use rendering::{
+    shapes::{RoundedRect, Text, TextBubble},
+    Color,
+    RenderManager,
+    Renderable,
+};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::*;
 use web_sys::{Request, RequestInit, RequestMode, Response, WebGlRenderingContext};
@@ -76,7 +81,7 @@ pub async fn render_test() -> Result<(), JsValue> {
             font: "Comic Sans MS".to_owned(),
             font_size: 50,
             fill_style: "Black".to_owned(),
-            outline: false
+            outline: false,
         },
         rect,
     };

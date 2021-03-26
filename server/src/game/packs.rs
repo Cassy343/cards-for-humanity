@@ -1,6 +1,12 @@
-use std::{collections::HashMap, convert::AsRef, fs, path::{Path, PathBuf}, rc::{Rc, Weak}};
 use common::data::cards::{Pack, Prompt, Response};
 use rand::Rng;
+use std::{
+    collections::HashMap,
+    convert::AsRef,
+    fs,
+    path::{Path, PathBuf},
+    rc::{Rc, Weak},
+};
 
 /// A store to manage loading and unloading [Packs](Pack)
 pub struct PackStore {
@@ -97,10 +103,7 @@ impl PackStore {
             Err(e) => return Err(format!("Error serializing pack: {}", e)),
         };
 
-        match fs::write(
-            self.custom_dir().join(&pack_name),
-            json,
-        ) {
+        match fs::write(self.custom_dir().join(&pack_name), json) {
             Ok(_) => {
                 self.possible_packs.push(format!("{}.json", pack_name));
                 Ok(())

@@ -4,7 +4,14 @@ use zip::ZipWriter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     Command::new("wasm-pack")
-        .args(&["build", "../client/", "--target", "web", "--out-dir", "../target/client-out"])
+        .args(&[
+            "build",
+            "../client/",
+            "--target",
+            "web",
+            "--out-dir",
+            "../target/client-out",
+        ])
         .spawn()
         .unwrap()
         .wait()

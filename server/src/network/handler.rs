@@ -1,32 +1,29 @@
-use std::sync::Arc;
+use crate::network::client::{ClientHandler, ClientMessage};
+use common::protocol::{decode, serverbound::ServerBoundPacket};
+use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
+use log::{error, warn};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 use tokio::sync::Mutex;
 use warp::ws::Message;
-use crate::network::client::{ClientHandler, ClientMessage};
-use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
-use std::cell::RefCell;
-use std::rc::Rc;
-use log::{error, warn};
-use common::protocol::{decode, serverbound::ServerBoundPacket};
 
 pub struct NetworkHandler {
     client_handler: Arc<Mutex<ClientHandler>>,
     incoming_messages: UnboundedReceiver<ClientMessage>,
     listeners: Vec<Rc<RefCell<Box<dyn Listener>>>>,
-    server_shutdown_hook: Option<Sender<()>>
+    server_shutdown_hook: Option<Sender<()>>,
 }
 
 impl NetworkHandler {
     pub fn new(
         client_handler: Arc<Mutex<ClientHandler>>,
         incoming_messages: UnboundedReceiver<ClientMessage>,
-        server_shutdown_hook: Sender<()>
-    ) -> Self
-    {
+        server_shutdown_hook: Sender<()>,
+    ) -> Self {
         NetworkHandler {
             client_handler,
             incoming_messages,
             listeners: Vec::new(),
-            server_shutdown_hook: Some(server_shutdown_hook)
+            server_shutdown_hook: Some(server_shutdown_hook),
         }
     }
 
@@ -37,7 +34,10 @@ impl NetworkHandler {
                     let text = match message.to_str() {
                         Ok(text) => text,
                         Err(_) => {
-                            warn!("Received invalid packet from client {}: {:?}", client_id, message);
+                            warn!(
+                                "Received invalid packet from client {}: {:?}",
+                                client_id, message
+                            );
                             continue;
                         }
                     };
@@ -45,28 +45,36 @@ impl NetworkHandler {
                     let packet: ServerBoundPacket = match decode(text) {
                         Ok(packet) => packet,
                         Err(_) => {
-                            warn!("Received invalid packet from client {}: {:?}", client_id, message);
+                            warn!(
+                                "Received invalid packet from client {}: {:?}",
+                                client_id, message
+                            );
                             continue;
                         }
                     };
 
-                    for i in 0..self.listeners.len() {
-                        self.listeners[i].clone().borrow_mut().handle_packet(self, &packet, client_id);
+                    for i in 0 .. self.listeners.len() {
+                        self.listeners[i]
+                            .clone()
+                            .borrow_mut()
+                            .handle_packet(self, &packet, client_id);
                     }
-                },
+                }
                 None => {
                     error!("Incoming message channel unexpectedly closed.");
                     return;
-                },
+                }
                 _ => {}
             }
         }
 
-        self.listeners.retain(|listener| !listener.borrow().is_terminated());
+        self.listeners
+            .retain(|listener| !listener.borrow().is_terminated());
     }
 
     pub fn add_listener<L: Listener + 'static>(&mut self, listener: L) {
-        self.listeners.push(Rc::new(RefCell::new(Box::new(listener))));
+        self.listeners
+            .push(Rc::new(RefCell::new(Box::new(listener))));
     }
 
     pub async fn shutdown(&mut self) {
@@ -74,19 +82,28 @@ impl NetworkHandler {
             Some(hook) => {
                 // If it fails it doesn't matter since we're shutting down anyway
                 let _ = hook.send(());
-            },
+            }
 
             // We've already shutdown
-            None => return
+            None => return,
         }
 
-        self.client_handler.lock().await.broadcast_all(Message::close()).await;
+        self.client_handler
+            .lock()
+            .await
+            .broadcast_all(Message::close())
+            .await;
         self.listeners.clear();
     }
 }
 
 pub trait Listener {
-    fn handle_packet(&mut self, network_handler: &mut NetworkHandler, packet: &ServerBoundPacket, sender_id: usize);
+    fn handle_packet(
+        &mut self,
+        network_handler: &mut NetworkHandler,
+        packet: &ServerBoundPacket,
+        sender_id: usize,
+    );
 
     fn is_terminated(&self) -> bool {
         false

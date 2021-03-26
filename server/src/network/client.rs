@@ -1,14 +1,14 @@
+use common::protocol::encode;
 use futures::{
     channel::mpsc::{self, SendError, UnboundedReceiver, UnboundedSender},
     SinkExt,
     StreamExt,
 };
+use log::{debug, error};
+use serde::Serialize;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use warp::ws::{Message, WebSocket};
-use log::{debug, error};
-use serde::Serialize;
-use common::protocol::encode;
 
 pub struct ClientHandler {
     client_list: HashMap<usize, Client>,
@@ -56,18 +56,30 @@ impl ClientHandler {
         self.client_list.remove(&id)
     }
 
-    pub async fn send_packet<P: Serialize>(&mut self, client_id: usize, packet: &P) -> Option<Result<(), SendError>> {
-        Some(self.get_client_mut(client_id)?.send(Message::text(encode(packet))).await)
+    pub async fn send_packet<P: Serialize>(
+        &mut self,
+        client_id: usize,
+        packet: &P,
+    ) -> Option<Result<(), SendError>> {
+        Some(
+            self.get_client_mut(client_id)?
+                .send(Message::text(encode(packet)))
+                .await,
+        )
     }
 
     pub async fn broadcast<P, F, E>(&mut self, packet: &P, mut filter: F, mut on_error: E)
     where
         P: Serialize,
         F: FnMut(&Client) -> bool,
-        E: FnMut(&Client)
+        E: FnMut(&Client),
     {
         let encoded = encode(packet);
-        for client in self.client_list.values_mut().filter(|client| filter(client)) {
+        for client in self
+            .client_list
+            .values_mut()
+            .filter(|client| filter(client))
+        {
             match client.send(Message::text(encoded.clone())).await {
                 Err(_) => on_error(client),
                 _ => {}
@@ -125,7 +137,11 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(id: usize, connection: UnboundedSender<Message>, address: Option<SocketAddr>) -> Self {
+    pub fn new(
+        id: usize,
+        connection: UnboundedSender<Message>,
+        address: Option<SocketAddr>,
+    ) -> Self {
         Client {
             id,
             connection,

@@ -4,6 +4,7 @@ mod network;
 
 use futures::channel::oneshot::{self, Sender};
 use linefeed::{Interface, ReadResult};
+use log::error;
 use network::{client::ClientHandler, NetworkHandler};
 use std::{
     error::Error,
@@ -12,15 +13,11 @@ use std::{
     net::SocketAddr,
     path::Path,
     sync::Arc,
-    time::Duration
+    time::Duration,
 };
 use tokio::sync::Mutex;
-use warp::{
-    ws::Ws,
-    Filter,
-};
+use warp::{ws::Ws, Filter};
 use zip::ZipArchive;
-use log::error;
 
 const CLIENT_FILES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client.zip"));
 
@@ -42,7 +39,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (raw_ch, incoming_messages) = ClientHandler::new();
     let client_handler = Arc::new(Mutex::new(raw_ch));
     let server_shutdown_hook = start_server(client_handler.clone()).await;
-    let mut network_handler = NetworkHandler::new(client_handler, incoming_messages, server_shutdown_hook);
+    let mut network_handler =
+        NetworkHandler::new(client_handler, incoming_messages, server_shutdown_hook);
     network_handler.add_listener(game::Game::new());
 
     loop {

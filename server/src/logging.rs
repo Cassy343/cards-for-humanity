@@ -208,12 +208,7 @@ impl CustomLogRoller {
         }
     }
 
-    pub fn roll_threaded(
-        &self,
-        file: &Path,
-        threaded: bool,
-    ) -> anyhow::Result<()>
-    {
+    pub fn roll_threaded(&self, file: &Path, threaded: bool) -> anyhow::Result<()> {
         let mut guard = match self.name_info.lock() {
             Ok(g) => g,
 

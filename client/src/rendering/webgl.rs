@@ -1,17 +1,17 @@
-use std::{collections::HashMap, ops::{Mul}};
+use std::{collections::HashMap, ops::Mul};
 
 use nalgebra::{Matrix2, Matrix2xX, Matrix3, Matrix4, Vector2, Vector3, Vector4};
 
-use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{HtmlCanvasElement, WebGlProgram, WebGl2RenderingContext, WebGlShader};
 use serde::Serialize;
+use wasm_bindgen::{prelude::*, JsCast};
+use web_sys::{HtmlCanvasElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 use crate::console_log;
 
 pub struct WebGlManager {
     context: WebGl2RenderingContext,
     shaders: HashMap<String, (WebGlProgram, u32)>,
-    aspect_ratio: Vector2<f32>
+    aspect_ratio: Vector2<f32>,
 }
 
 macro_rules! attr_load {
@@ -54,22 +54,23 @@ macro_rules! attr_load {
 
 #[derive(Serialize)]
 struct ContextOptions {
-    antialias: bool
+    antialias: bool,
 }
 
 
 impl WebGlManager {
     pub fn new(
         webgl_canvas: &HtmlCanvasElement,
-        canvas_size: Vector2<f32>
+        canvas_size: Vector2<f32>,
     ) -> Result<Self, JsValue> {
-        let context :WebGl2RenderingContext = webgl_canvas
+        let context: WebGl2RenderingContext = webgl_canvas
             .get_context_with_context_options(
-                "webgl2", 
-                &JsValue::from_serde(
-                    &ContextOptions {antialias: true})
-                .expect("Error serializing webgl2 context options"))?
-            .unwrap().dyn_into()?;
+                "webgl2",
+                &JsValue::from_serde(&ContextOptions { antialias: true })
+                    .expect("Error serializing webgl2 context options"),
+            )?
+            .unwrap()
+            .dyn_into()?;
 
         context.enable(WebGl2RenderingContext::BLEND);
         context.enable(WebGl2RenderingContext::SAMPLE_COVERAGE);
@@ -80,7 +81,10 @@ impl WebGlManager {
         Ok(WebGlManager {
             context,
             shaders: HashMap::new(),
-            aspect_ratio: Vector2::new(canvas_size.x / canvas_size.y, canvas_size.y / canvas_size.x)
+            aspect_ratio: Vector2::new(
+                canvas_size.x / canvas_size.y,
+                canvas_size.y / canvas_size.x,
+            ),
         })
     }
 
@@ -182,14 +186,17 @@ impl WebGlManager {
 
         uniforms.push(Uniform {
             name: "position".to_owned(),
-            kind: UniformType::FVec2(obj.position().component_div(&Vector2::from(super::BASE_RESOLUTION))),
+            kind: UniformType::FVec2(
+                obj.position()
+                    .component_div(&Vector2::from(super::BASE_RESOLUTION)),
+            ),
         });
 
         console_log!("{}", self.aspect_ratio);
 
         uniforms.push(Uniform {
             name: "aspect_ratio".to_owned(),
-            kind: UniformType::Float(self.aspect_ratio.x)
+            kind: UniformType::Float(self.aspect_ratio.x),
         });
 
         self.register_uniforms(&uniforms, shader_program);

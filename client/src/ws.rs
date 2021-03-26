@@ -1,13 +1,13 @@
-﻿use std::{
+use common::protocol::encode;
+use serde::Serialize;
+use std::{
     convert::AsRef,
     error::Error as StdError,
     fmt::{self, Debug, Display, Formatter},
-    sync::Arc
+    sync::Arc,
 };
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 use web_sys::{CloseEvent, ErrorEvent, MessageEvent, WebSocket as WebSysSocket};
-use serde::Serialize;
-use common::protocol::encode;
 
 macro_rules! set_handler {
     ($sock:expr, $event_type:ty, $handler:ident, $callback:expr) => {{

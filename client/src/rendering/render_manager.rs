@@ -2,7 +2,10 @@ use nalgebra::Vector2;
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, TextMetrics};
 
-use super::{Color, webgl::{WebGLRenderable, WebGlManager}};
+use super::{
+    webgl::{WebGLRenderable, WebGlManager},
+    Color,
+};
 
 pub static BASE_RESOLUTION: [f32; 2] = [1600.0, 900.0];
 
@@ -36,7 +39,10 @@ impl RenderManager {
     }
 
     pub fn update_scale_factor(&mut self) {
-        let canvas_size = Vector2::new(self.text_canvas.width() as f32, self.text_canvas.height() as f32);
+        let canvas_size = Vector2::new(
+            self.text_canvas.width() as f32,
+            self.text_canvas.height() as f32,
+        );
         self.scale_factor = canvas_size.component_div(&Vector2::from(BASE_RESOLUTION));
     }
 
@@ -51,7 +57,8 @@ impl RenderManager {
     }
 
     pub fn set_background_color(&self, color: Color) {
-        self.webgl_manager.set_clear_color(color.r(), color.g(), color.b())
+        self.webgl_manager
+            .set_clear_color(color.r(), color.g(), color.b())
     }
 
     pub fn get_text_spacing(&self, text: &str) -> Result<TextMetrics, String> {
