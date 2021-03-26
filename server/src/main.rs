@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Err(e) => error!("Failed to read console input: {}", e),
         }
 
-        network_handler.handle_messages();
+        network_handler.handle_messages().await;
     }
 
     network_handler.shutdown().await;

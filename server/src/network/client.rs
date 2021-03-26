@@ -13,11 +13,11 @@ use warp::ws::{Message, WebSocket};
 pub struct ClientHandler {
     client_list: HashMap<usize, Client>,
     client_id: usize,
-    message_pipe: UnboundedSender<ClientMessage>,
+    message_pipe: UnboundedSender<ClientEvent>,
 }
 
 impl ClientHandler {
-    pub fn new() -> (Self, UnboundedReceiver<ClientMessage>) {
+    pub fn new() -> (Self, UnboundedReceiver<ClientEvent>) {
         let (message_pipe, message_aggregator) = mpsc::unbounded();
         (
             ClientHandler {
@@ -29,7 +29,7 @@ impl ClientHandler {
         )
     }
 
-    pub fn message_pipe(&self) -> UnboundedSender<ClientMessage> {
+    pub fn message_pipe(&self) -> UnboundedSender<ClientEvent> {
         self.message_pipe.clone()
     }
 
@@ -61,9 +61,23 @@ impl ClientHandler {
         client_id: usize,
         packet: &P,
     ) -> Option<Result<(), SendError>> {
+        self.send_packets(client_id, &[packet]).await
+    }
+
+    pub async fn send_packets<'a, T, P>(
+        &mut self,
+        client_id: usize,
+        packets: T,
+    ) -> Option<Result<(), SendError>>
+    where
+        T: IntoIterator<Item = &'a P>,
+        P: Serialize + 'a,
+    {
         Some(
             self.get_client_mut(client_id)?
-                .send(Message::text(encode(packet)))
+                .send(Message::text(encode(
+                    &(packets.into_iter().collect::<Vec<_>>()),
+                )))
                 .await,
         )
     }
@@ -74,7 +88,7 @@ impl ClientHandler {
         F: FnMut(&Client) -> bool,
         E: FnMut(&Client),
     {
-        let encoded = encode(packet);
+        let encoded = encode(&[packet]);
         for client in self
             .client_list
             .values_mut()
@@ -107,6 +121,12 @@ impl ClientHandler {
         let mut handler_guard = client_handler.lock().await;
         let id = handler_guard.add_client(tx.clone(), address);
         let mut pipe = handler_guard.message_pipe();
+
+        if let Err(e) = pipe.send(ClientEvent::connect(id)).await {
+            error!("Failed to send client connect event, {}", e);
+            handler_guard.remove_client(id);
+        }
+
         drop(handler_guard);
 
         debug!("New client connected (ID {})", id);
@@ -120,18 +140,19 @@ impl ClientHandler {
                 }
             };
 
-            if let Err(e) = pipe.send(ClientMessage::new(message, id)).await {
+            if let Err(e) = pipe.send(ClientEvent::message(message, id)).await {
                 error!("Failed to pipe WS message to handler, {}", e);
             }
         }
 
+        let _ = pipe.send(ClientEvent::disconnect(id)).await;
         client_handler.lock().await.remove_client(id);
         debug!("Client disconnected (ID {})", id);
     }
 }
 
 pub struct Client {
-    id: usize,
+    pub id: usize,
     connection: UnboundedSender<Message>,
     address: Option<SocketAddr>,
 }
@@ -149,22 +170,41 @@ impl Client {
         }
     }
 
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
     pub async fn send(&mut self, message: Message) -> Result<(), SendError> {
         self.connection.send(message).await
     }
 }
 
-pub struct ClientMessage {
-    pub message: Message,
+pub struct ClientEvent {
+    pub data: ClientEventData,
     pub client_id: usize,
 }
 
-impl ClientMessage {
-    pub fn new(message: Message, client_id: usize) -> Self {
-        ClientMessage { message, client_id }
+impl ClientEvent {
+    pub fn connect(client_id: usize) -> Self {
+        ClientEvent {
+            data: ClientEventData::Connect,
+            client_id,
+        }
     }
+
+    pub fn message(message: Message, client_id: usize) -> Self {
+        ClientEvent {
+            data: ClientEventData::Message(message),
+            client_id,
+        }
+    }
+
+    pub fn disconnect(client_id: usize) -> Self {
+        ClientEvent {
+            data: ClientEventData::Disconnect,
+            client_id,
+        }
+    }
+}
+
+pub enum ClientEventData {
+    Connect,
+    Message(Message),
+    Disconnect,
 }

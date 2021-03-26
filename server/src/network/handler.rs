@@ -1,4 +1,5 @@
-use crate::network::client::{ClientHandler, ClientMessage};
+use crate::network::client::{ClientEvent, ClientEventData, ClientHandler};
+use async_trait::async_trait;
 use common::protocol::{decode, serverbound::ServerBoundPacket};
 use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
 use log::{error, warn};
@@ -7,8 +8,8 @@ use tokio::sync::Mutex;
 use warp::ws::Message;
 
 pub struct NetworkHandler {
-    client_handler: Arc<Mutex<ClientHandler>>,
-    incoming_messages: UnboundedReceiver<ClientMessage>,
+    pub client_handler: Arc<Mutex<ClientHandler>>,
+    incoming_messages: UnboundedReceiver<ClientEvent>,
     listeners: Vec<Rc<RefCell<Box<dyn Listener>>>>,
     server_shutdown_hook: Option<Sender<()>>,
 }
@@ -16,7 +17,7 @@ pub struct NetworkHandler {
 impl NetworkHandler {
     pub fn new(
         client_handler: Arc<Mutex<ClientHandler>>,
-        incoming_messages: UnboundedReceiver<ClientMessage>,
+        incoming_messages: UnboundedReceiver<ClientEvent>,
         server_shutdown_hook: Sender<()>,
     ) -> Self {
         NetworkHandler {
@@ -27,10 +28,17 @@ impl NetworkHandler {
         }
     }
 
-    pub fn handle_messages(&mut self) {
+    pub async fn handle_messages(&mut self) {
         while let Ok(message) = self.incoming_messages.try_next() {
             match message {
-                Some(ClientMessage { message, client_id }) if message.is_text() => {
+                Some(ClientEvent {
+                    data: ClientEventData::Message(message),
+                    client_id,
+                }) => {
+                    if !message.is_text() {
+                        return;
+                    }
+
                     let text = match message.to_str() {
                         Ok(text) => text,
                         Err(_) => {
@@ -42,8 +50,8 @@ impl NetworkHandler {
                         }
                     };
 
-                    let packet: ServerBoundPacket = match decode(text) {
-                        Ok(packet) => packet,
+                    let packets: Vec<ServerBoundPacket> = match decode(text) {
+                        Ok(packets) => packets,
                         Err(_) => {
                             warn!(
                                 "Received invalid packet from client {}: {:?}",
@@ -54,17 +62,40 @@ impl NetworkHandler {
                     };
 
                     for i in 0 .. self.listeners.len() {
-                        self.listeners[i]
-                            .clone()
-                            .borrow_mut()
-                            .handle_packet(self, &packet, client_id);
+                        for packet in packets.iter() {
+                            self.listeners[i]
+                                .clone()
+                                .borrow_mut()
+                                .handle_packet(self, packet, client_id)
+                                .await;
+                        }
                     }
                 }
+                Some(ClientEvent { data, client_id }) => match data {
+                    ClientEventData::Connect =>
+                        for i in 0 .. self.listeners.len() {
+                            self.listeners[i]
+                                .clone()
+                                .borrow_mut()
+                                .client_connected(self, client_id)
+                                .await;
+                        },
+
+                    ClientEventData::Disconnect =>
+                        for i in 0 .. self.listeners.len() {
+                            self.listeners[i]
+                                .clone()
+                                .borrow_mut()
+                                .client_disconnected(self, client_id)
+                                .await;
+                        },
+
+                    _ => unreachable!(),
+                },
                 None => {
                     error!("Incoming message channel unexpectedly closed.");
                     return;
                 }
-                _ => {}
             }
         }
 
@@ -97,8 +128,13 @@ impl NetworkHandler {
     }
 }
 
+#[async_trait(?Send)]
 pub trait Listener {
-    fn handle_packet(
+    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: usize);
+
+    async fn client_disconnected(&mut self, network_handler: &mut NetworkHandler, client_id: usize);
+
+    async fn handle_packet(
         &mut self,
         network_handler: &mut NetworkHandler,
         packet: &ServerBoundPacket,

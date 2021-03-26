@@ -7,6 +7,21 @@ use serde::{
     Serializer,
 };
 
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct CardID {
+    pub pack_number: usize,
+    pub card_number: usize,
+}
+
+impl CardID {
+    pub fn new(pack_number: usize, card_number: usize) -> Self {
+        CardID {
+            pack_number,
+            card_number,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Pack {
     pub name: String,

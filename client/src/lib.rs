@@ -6,6 +6,7 @@ mod ws;
 #[macro_use]
 mod console;
 
+use common::protocol::{clientbound::ClientBoundPacket, decode};
 use nalgebra::Vector2;
 use rendering::{
     shapes::{RoundedRect, Text, TextBubble},
@@ -13,6 +14,7 @@ use rendering::{
     RenderManager,
     Renderable,
 };
+use std::sync::mpsc;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::*;
 use web_sys::{Request, RequestInit, RequestMode, Response, WebGlRenderingContext};
@@ -22,19 +24,53 @@ use ws::WebSocket;
 pub fn client_main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     spawn_local(async {
-        let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
-
-        socket.onopen(|socket| {
-            console_log!("Socket opened");
-            let _ =
-                socket.send_packet(&common::protocol::serverbound::ServerBoundPacket::StartGame);
-        });
-        socket.onmessage(|_socket, event| console_log!("{:?}", event.data()));
-        socket.onclose(|_socket, event| console_log!("{:?}", event));
-        socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
-
         render_test().await.unwrap();
-    })
+    });
+
+    let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
+    let (packet_pipe, packet_receiver) = mpsc::channel::<ClientBoundPacket>();
+
+    socket.onopen(|socket| {
+        console_log!("Socket opened");
+        let _ = socket.send_packet(&common::protocol::serverbound::ServerBoundPacket::StartGame);
+    });
+    socket.onmessage(move |_socket, event| {
+        let packet_string = match event.data().as_string() {
+            Some(string) => string,
+            None => return,
+        };
+
+        match decode::<'_, Vec<ClientBoundPacket>>(&packet_string) {
+            Ok(packets) =>
+                for packet in packets {
+                    if let Err(e) = packet_pipe.send(packet) {
+                        console_error!("Failed to forward packet to handler: {}", e);
+                    }
+                },
+
+            Err(error) => console_error!(
+                "Failed to parse packets: {}, raw data: {}",
+                error,
+                packet_string
+            ),
+        }
+    });
+    socket.onclose(|_socket, event| console_log!("{:?}", event));
+    socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
+
+    let game_loop = Closure::<dyn FnMut()>::new(move || {
+        while let Ok(packet) = packet_receiver.try_recv() {
+            console_log!("Packet received: {:?}", packet);
+        }
+    });
+    web_sys::window()
+        .unwrap()
+        .set_interval_with_callback_and_timeout_and_arguments_0(
+            game_loop.as_ref().unchecked_ref(),
+            50,
+        )
+        .unwrap();
+    game_loop.forget();
 }
 
 

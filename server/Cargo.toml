@@ -20,6 +20,7 @@ log4rs = "1.0.0"
 chrono = "0.4.19"
 chrono-tz = "0.5.3"
 serde = "1.0"
+async-trait = "0.1.48"
 
 [target.'cfg(unix)'.dependencies]
 termion = "1.5.6"

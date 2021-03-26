@@ -3,6 +3,14 @@ pub mod serverbound;
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum GameSetting {
+    MaxPlayers(Option<usize>),
+    MaxSelectionTime(Option<u32>),
+    AddPack(String),
+    RemovePack(String),
+}
+
 pub fn encode<P: Serialize>(packet: &P) -> String {
     serde_json::to_string(packet).unwrap()
 }

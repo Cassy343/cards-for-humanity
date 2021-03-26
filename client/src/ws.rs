@@ -49,7 +49,17 @@ impl WebSocket {
     }
 
     pub fn send_packet<P: Serialize>(&self, packet: &P) -> Result<(), SocketError> {
-        self.0.send_with_str(&encode(packet)).map_err(Into::into)
+        self.send_packets(&[packet])
+    }
+
+    pub fn send_packets<'a, T, P>(&self, packets: &'a T) -> Result<(), SocketError>
+    where
+        &'a T: IntoIterator<Item = &'a P>,
+        P: Serialize + 'a,
+    {
+        self.0
+            .send_with_str(&encode(&packets.into_iter().collect::<Vec<_>>()))
+            .map_err(Into::into)
     }
 }
 
