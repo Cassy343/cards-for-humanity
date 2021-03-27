@@ -3,15 +3,18 @@ mod logging;
 mod network;
 
 use futures::channel::oneshot::{self, Sender};
+use game::packs::PackStore;
 use linefeed::{Interface, ReadResult};
 use log::error;
 use network::{client::ClientHandler, NetworkHandler};
 use std::{
+    cell::RefCell,
     error::Error,
     fs::{create_dir_all, File},
     io::{copy, Cursor, Error as IoError},
     net::SocketAddr,
     path::Path,
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -36,12 +39,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         _ => {}
     }
 
+    let pack_store = match PackStore::new("./packs") {
+        Ok(pack_store) => Rc::new(RefCell::new(pack_store)),
+        Err(e) => {
+            error!("Failed to create card pack manager: {}", e);
+            return Ok(());
+        }
+    };
+
     let (raw_ch, incoming_messages) = ClientHandler::new();
     let client_handler = Arc::new(Mutex::new(raw_ch));
     let server_shutdown_hook = start_server(client_handler.clone()).await;
     let mut network_handler =
         NetworkHandler::new(client_handler, incoming_messages, server_shutdown_hook);
-    network_handler.add_listener(game::Game::new());
+    network_handler.add_listener(game::Game::new(pack_store));
 
     loop {
         // Check for a new command every 50ms

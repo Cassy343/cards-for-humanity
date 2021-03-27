@@ -36,8 +36,15 @@ pub struct Pack {
     pub prompts: Vec<Prompt>,
 }
 
+impl PartialEq for Pack {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
 
-#[derive(Serialize, Deserialize, Clone)]
+impl Eq for Pack {}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Prompt {
     pub text: String,
     pub pick: u8,

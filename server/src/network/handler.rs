@@ -1,6 +1,10 @@
 use crate::network::client::{ClientEvent, ClientEventData, ClientHandler};
 use async_trait::async_trait;
-use common::protocol::{decode, serverbound::ServerBoundPacket};
+use common::protocol::{
+    clientbound::{ClientBoundPacket, PacketResponse},
+    decode,
+    serverbound::{ServerBoundPacket, WrappedServerBoundPacket},
+};
 use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
 use log::{error, warn};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -29,6 +33,8 @@ impl NetworkHandler {
     }
 
     pub async fn handle_messages(&mut self) {
+        let mut acknowledgements = Vec::new();
+
         while let Ok(message) = self.incoming_messages.try_next() {
             match message {
                 Some(ClientEvent {
@@ -50,7 +56,7 @@ impl NetworkHandler {
                         }
                     };
 
-                    let packets: Vec<ServerBoundPacket> = match decode(text) {
+                    let packets: Vec<WrappedServerBoundPacket> = match decode(text) {
                         Ok(packets) => packets,
                         Err(_) => {
                             warn!(
@@ -63,13 +69,31 @@ impl NetworkHandler {
 
                     for i in 0 .. self.listeners.len() {
                         for packet in packets.iter() {
-                            self.listeners[i]
+                            let response = self.listeners[i]
                                 .clone()
                                 .borrow_mut()
-                                .handle_packet(self, packet, client_id)
+                                .handle_packet(self, packet.packet(), client_id)
                                 .await;
+                            if let Some(id) = packet.packet_id() {
+                                acknowledgements.push((id, response));
+                            }
                         }
                     }
+
+                    self.client_handler
+                        .lock()
+                        .await
+                        .send_packets(
+                            client_id,
+                            &acknowledgements
+                                .drain(..)
+                                .map(|(id, response)| ClientBoundPacket::Ack {
+                                    packet_id: id,
+                                    response,
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                        .await;
                 }
                 Some(ClientEvent { data, client_id }) => match data {
                     ClientEventData::Connect =>
@@ -139,7 +163,7 @@ pub trait Listener {
         network_handler: &mut NetworkHandler,
         packet: &ServerBoundPacket,
         sender_id: usize,
-    );
+    ) -> PacketResponse;
 
     fn is_terminated(&self) -> bool {
         false

@@ -4,9 +4,13 @@ use std::{
     collections::HashMap,
     convert::AsRef,
     fs,
+    io::{self, ErrorKind},
     path::{Path, PathBuf},
     rc::{Rc, Weak},
 };
+
+const DEFAULT_PACK: &str = "CAH Base Set";
+const DEFAULT_PACK_JSON: &str = "CAH Base Set.json";
 
 /// A store to manage loading and unloading [Packs](Pack)
 pub struct PackStore {
@@ -53,12 +57,21 @@ impl PackStore {
         possible_packs.extend(official_packs.clone());
         possible_packs.extend(custom_packs);
 
-        Ok(PackStore {
+        let mut pack_store = PackStore {
             possible_packs,
             pack_dir: pack_dir.to_owned(),
             loaded_packs: HashMap::new(),
             official_packs,
-        })
+        };
+
+        pack_store
+            .load_pack(DEFAULT_PACK)
+            .map_err(|_| io::Error::new(ErrorKind::NotFound, "Default pack file not found."))?;
+        Ok(pack_store)
+    }
+
+    pub fn default_pack(&self) -> Rc<Pack> {
+        self.loaded_packs.get(DEFAULT_PACK_JSON).unwrap().clone()
     }
 
     /// Loads in a pack from json
@@ -84,6 +97,10 @@ impl PackStore {
 
     /// Unloads a pack if no games are using it
     pub fn unload_pack(&mut self, pack_name: &str) {
+        if pack_name == DEFAULT_PACK {
+            return;
+        }
+
         let pack_name = &format!("{}.json", pack_name);
         if self.loaded_packs.contains_key(pack_name) {
             let pack = self.loaded_packs.get(pack_name).unwrap();

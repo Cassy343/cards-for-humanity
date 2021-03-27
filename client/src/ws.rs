@@ -1,4 +1,4 @@
-use common::protocol::encode;
+use common::protocol::{encode, serverbound::ServerBoundPacket};
 use serde::Serialize;
 use std::{
     convert::AsRef,
@@ -6,6 +6,7 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     sync::Arc,
 };
+use uuid::Uuid;
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 use web_sys::{CloseEvent, ErrorEvent, MessageEvent, WebSocket as WebSysSocket};
 
@@ -52,14 +53,19 @@ impl WebSocket {
         self.send_packets(&[packet])
     }
 
+    pub fn send_packet_with_id(&self, packet: ServerBoundPacket) -> Result<Uuid, SocketError> {
+        let (packet, id) = packet.with_id();
+        self.send_packets(&[packet]).map(|_| id)
+    }
+
     pub fn send_packets<'a, T, P>(&self, packets: &'a T) -> Result<(), SocketError>
     where
         &'a T: IntoIterator<Item = &'a P>,
         P: Serialize + 'a,
     {
-        self.0
-            .send_with_str(&encode(&packets.into_iter().collect::<Vec<_>>()))
-            .map_err(Into::into)
+        let data = encode(&packets.into_iter().collect::<Vec<_>>());
+        crate::console_log!("Sending packet data: {}", data);
+        self.0.send_with_str(&data).map_err(Into::into)
     }
 }
 

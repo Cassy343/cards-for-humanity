@@ -13,6 +13,7 @@ wasm-bindgen = { version = "0.2.72", features = ["nightly", "serde-serialize"] }
 nalgebra = "0.25.3"
 wasm-bindgen-futures = "0.4.22"
 console_error_panic_hook = "0.1.6"
+uuid = { version = "0.8.2", features = ["wasm-bindgen"] }
 
 [lib]
 crate-type =["cdylib"]

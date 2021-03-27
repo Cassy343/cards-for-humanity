@@ -1,4 +1,4 @@
-use common::protocol::encode;
+use common::protocol::{clientbound::ClientBoundPacket, encode};
 use futures::{
     channel::mpsc::{self, SendError, UnboundedReceiver, UnboundedSender},
     SinkExt,
@@ -33,15 +33,17 @@ impl ClientHandler {
         self.message_pipe.clone()
     }
 
-    pub fn add_client(
+    pub async fn add_client(
         &mut self,
-        conn: UnboundedSender<Message>,
+        mut conn: UnboundedSender<Message>,
         address: Option<SocketAddr>,
-    ) -> usize {
+    ) -> Result<usize, SendError> {
         let id = self.client_id;
+        conn.send(Message::text(encode(&[ClientBoundPacket::SetId(id)])))
+            .await?;
         self.client_list.insert(id, Client::new(id, conn, address));
         self.client_id += 1;
-        id
+        Ok(id)
     }
 
     pub fn get_client(&self, client_id: usize) -> Option<&Client> {
@@ -119,7 +121,13 @@ impl ClientHandler {
         tokio::task::spawn(rx.map(|message| Ok(message)).forward(ws_tx));
 
         let mut handler_guard = client_handler.lock().await;
-        let id = handler_guard.add_client(tx.clone(), address);
+        let id = match handler_guard.add_client(tx.clone(), address).await {
+            Ok(id) => id,
+            Err(e) => {
+                error!("Failed to add client: {}", e);
+                return;
+            }
+        };
         let mut pipe = handler_guard.message_pipe();
 
         if let Err(e) = pipe.send(ClientEvent::connect(id)).await {

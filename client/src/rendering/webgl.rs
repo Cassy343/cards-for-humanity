@@ -203,7 +203,7 @@ impl WebGlManager {
 
         uniforms.push(Uniform {
             name: "canvas_dimensions".to_owned(),
-            kind: UniformType::FVec2(self.canvas_size)
+            kind: UniformType::FVec2(self.canvas_size),
         });
 
         self.register_uniforms(&uniforms, shader_program);

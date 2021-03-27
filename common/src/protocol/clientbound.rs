@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use super::{serverbound::ServerBoundPacket, GameSetting};
-use crate::data::cards::{CardID, Response};
+use crate::data::cards::{CardID, Prompt, Response};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientBoundPacket {
+    SetId(usize),
     StartGame,
     SettingUpdate(GameSetting),
     AddPlayer {
@@ -22,13 +24,21 @@ pub enum ClientBoundPacket {
         id: usize,
         new_host: Option<usize>,
     },
+    PlayerFinishedPicking(usize),
     DisplayResponses(HashMap<usize, Vec<Response>>),
     NextRound {
         is_czar: bool,
+        prompt: Prompt,
         new_responses: Vec<ResponseData>,
     },
-    EndGame {
+    CancelRound,
+    DisplayWinner {
         winner: usize,
+        end_game: bool,
+    },
+    Ack {
+        packet_id: Uuid,
+        response: PacketResponse,
     },
 }
 
@@ -48,4 +58,11 @@ impl ResponseData {
     pub fn new(id: CardID, text: Response) -> Self {
         ResponseData { id, text }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum PacketResponse {
+    Accepted,
+    Rejected,
+    RejectedWithReason(String),
 }

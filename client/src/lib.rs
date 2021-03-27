@@ -6,7 +6,7 @@ mod ws;
 #[macro_use]
 mod console;
 
-use common::protocol::{clientbound::ClientBoundPacket, decode};
+use common::protocol::{clientbound::ClientBoundPacket, decode, serverbound::ServerBoundPacket};
 use nalgebra::Vector2;
 use rendering::{
     shapes::{RoundedRect, Text, TextBubble},
@@ -32,7 +32,8 @@ pub fn client_main() {
 
     socket.onopen(|socket| {
         console_log!("Socket opened");
-        let _ = socket.send_packet(&common::protocol::serverbound::ServerBoundPacket::StartGame);
+        let _ =
+            socket.send_packet_with_id(common::protocol::serverbound::ServerBoundPacket::StartGame);
     });
     socket.onmessage(move |_socket, event| {
         let packet_string = match event.data().as_string() {

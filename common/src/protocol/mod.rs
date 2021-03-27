@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub enum GameSetting {
     MaxPlayers(Option<usize>),
     MaxSelectionTime(Option<u32>),
+    PointsToWin(u32),
     AddPack(String),
     RemovePack(String),
 }
