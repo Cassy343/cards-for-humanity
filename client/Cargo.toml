@@ -23,6 +23,7 @@ version = "0.3.48"
 features = [
     'Document',
     'Element',
+    'HtmlElement',
     'HtmlCanvasElement',
     'WebGlBuffer',
     'WebGlRenderingContext',
@@ -33,6 +34,7 @@ features = [
     'WebSocket',
     'console',
     'MessageEvent',
+    'MouseEvent',
     'WebGlUniformLocation',
     "CloseEvent",
     "ErrorEvent",

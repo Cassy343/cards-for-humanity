@@ -178,6 +178,12 @@ impl<T: WebGLRenderable> Renderable for T {
     }
 }
 
+impl<T: Renderable> Renderable for Vec<T> {
+    fn render(&self, render_manager: &RenderManager) -> Result<(), String> {
+        render_manager.draw_objects(self.iter().map(|v| v as &dyn Renderable).collect())
+    }
+}
+
 
 #[wasm_bindgen]
 extern "C" {

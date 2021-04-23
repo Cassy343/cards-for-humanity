@@ -1,12 +1,15 @@
 #![feature(unsize)]
 
+mod clicking;
+mod game;
 mod rendering;
 mod ws;
 
 #[macro_use]
 mod console;
 
-use common::protocol::{clientbound::ClientBoundPacket, decode, serverbound::ServerBoundPacket};
+use common::protocol::{clientbound::ClientBoundPacket, decode};
+use game::game_init;
 use nalgebra::Vector2;
 use rendering::{
     shapes::{RoundedRect, Text, TextBubble},
@@ -14,7 +17,7 @@ use rendering::{
     RenderManager,
     Renderable,
 };
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::*;
 use web_sys::{Request, RequestInit, RequestMode, Response, WebGlRenderingContext};
@@ -59,19 +62,7 @@ pub fn client_main() {
     socket.onclose(|_socket, event| console_log!("{:?}", event));
     socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
 
-    let game_loop = Closure::<dyn FnMut()>::new(move || {
-        while let Ok(packet) = packet_receiver.try_recv() {
-            console_log!("Packet received: {:?}", packet);
-        }
-    });
-    web_sys::window()
-        .unwrap()
-        .set_interval_with_callback_and_timeout_and_arguments_0(
-            game_loop.as_ref().unchecked_ref(),
-            50,
-        )
-        .unwrap();
-    game_loop.forget();
+    game_init(socket, Arc::new(packet_receiver));
 }
 
 
@@ -128,6 +119,10 @@ pub async fn render_test() -> Result<(), JsValue> {
     manager.draw_objects(objects)?;
 
     let resize_callback = Closure::<dyn FnMut()>::new(move || {
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        let text_canvas = document.get_element_by_id("text").unwrap();
+        let _: web_sys::HtmlCanvasElement = text_canvas.dyn_into().unwrap();
         manager.clear();
         let mut objects: Vec<&dyn Renderable> = Vec::new();
         objects.push(&text_bubble);

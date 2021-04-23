@@ -1,9 +1,81 @@
+use common::data::cards::CardID;
 use nalgebra::{Matrix2xX, Vector2, Vector4};
 use wasm_bindgen::JsCast;
 
 use super::{webgl::*, Color, ExtendedTextMetrics, RenderManager, Renderable};
 
-use crate::console_log;
+use crate::{console_log, game::{Clickable, GameManager}};
+
+pub struct PromptCard {
+    pub inner: TextBubble,
+}
+
+impl PromptCard {
+    pub fn new(text: &str, pos: Vector2<f32>, dimensions: Vector2<f32>) -> Self {
+        PromptCard {
+            inner: TextBubble {
+                text: Text {
+                    text: text.to_owned(),
+                    text_pos: pos,
+                    width: None,
+                    font: "Comic Sans MS".to_owned(),
+                    font_size: 20,
+                    fill_style: "White".to_owned(),
+                    outline: false,
+                },
+                rect: RoundedRect {
+                    position: pos,
+                    dimensions,
+                    color: Color::Black(),
+                    radius: 0.25,
+                },
+            },
+        }
+    }
+}
+
+impl Renderable for PromptCard {
+    fn render(&self, render_manager: &RenderManager) -> Result<(), String> {
+        self.inner.render(render_manager)
+    }
+}
+
+pub struct ResponseCard {
+    pub id: CardID,
+    pub inner: TextBubble,
+}
+
+impl ResponseCard {
+    pub fn new(text: &str, id: CardID, pos: Vector2<f32>, dimensions: Vector2<f32>) -> Self {
+        ResponseCard {
+            id,
+            inner: TextBubble {
+                text: Text {
+                    text: text.to_owned(),
+                    text_pos: pos,
+                    width: None,
+                    font: "Comic Sans MS".to_owned(),
+                    font_size: 20,
+                    fill_style: "Black".to_owned(),
+                    outline: false,
+                },
+                rect: RoundedRect {
+                    position: pos,
+                    dimensions,
+                    color: Color::Grey(),
+                    radius: 0.25,
+                },
+            },
+        }
+    }
+}
+
+impl Renderable for ResponseCard {
+    fn render(&self, render_manager: &RenderManager) -> Result<(), String> {
+        self.inner.render(render_manager)
+    }
+}
+
 
 pub struct Meme {
     pub rect: RoundedRect,

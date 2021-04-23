@@ -25,16 +25,37 @@ macro_rules! rgb_get {
     };
 }
 
+macro_rules! color_consts {
+    ($($fn_name: ident, $r: expr, $g: expr, $b: expr),*) => {
+        $(
+            #[allow(non_snake_case)]
+            pub fn $fn_name() -> Color {
+            Color {
+                inner: Vector3::new($r,$g,$b)
+            }
+        })*
+    };
+}
+
 #[allow(dead_code)]
 impl Color {
     rgb_get! {r, r_int, x, g, g_int, y, b, b_int, z}
 
+    color_consts! {
+        Red, 1.0, 0.0, 0.0,
+        Green, 0.0, 1.0, 0.0,
+        Blue, 0.0, 0.0, 1.0,
+        White, 1.0, 1.0, 1.0,
+        Black, 0.0, 0.0, 0.0,
+        Grey, 0.5, 0.5, 0.5
+    }
+
     pub fn from_hex_str(str: &str) -> Result<Color, ParseIntError> {
         Ok(Color {
             inner: Vector3::new(
-                u8::from_str_radix(&str[0 .. 2], 16)? as f32,
-                u8::from_str_radix(&str[2 .. 4], 16)? as f32,
-                u8::from_str_radix(&str[4 .. 6], 16)? as f32,
+                (u8::from_str_radix(&str[0 .. 2], 16)?) as f32 / 256.0,
+                (u8::from_str_radix(&str[2 .. 4], 16)?) as f32 / 256.0,
+                (u8::from_str_radix(&str[4 .. 6], 16)?) as f32 / 256.0,
             ),
         })
     }
