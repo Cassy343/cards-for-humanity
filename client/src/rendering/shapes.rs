@@ -4,7 +4,33 @@ use wasm_bindgen::JsCast;
 
 use super::{webgl::*, Color, ExtendedTextMetrics, RenderManager, Renderable};
 
-use crate::{console_log, game::{Clickable, GameManager}};
+use crate::{console_log, game::Player};
+
+impl Renderable for Vec<Player> {
+    fn render(&self, render_manager: &RenderManager) -> Result<(), String> {
+        for i in 0 .. self.len() {
+            let player = self.get(i).unwrap();
+            let text = Text {
+                width: None,
+                font: "Comic Sans MS".to_owned(),
+                font_size: 16,
+                fill_style: "Black".to_owned(),
+                outline: false,
+                text: format!("{}\nPoints: {}", player.name, player.points),
+                text_pos: Vector2::new(i as f32 * 80.0, 20.0),
+            };
+            render_manager.draw_object(&TextBubble::from_text(
+                text,
+                Color::from_rgb(0xff, 0x00, 0xae),
+                Vector2::new(100.0, 100.0),
+                0.025,
+            ) as &dyn Renderable)?;
+        }
+
+        Ok(())
+    }
+}
+
 
 pub struct PromptCard {
     pub inner: TextBubble,
@@ -27,7 +53,7 @@ impl PromptCard {
                     position: pos,
                     dimensions,
                     color: Color::Black(),
-                    radius: 0.25,
+                    radius: 0.025,
                 },
             },
         }
@@ -63,7 +89,7 @@ impl ResponseCard {
                     position: pos,
                     dimensions,
                     color: Color::Grey(),
-                    radius: 0.25,
+                    radius: 0.025,
                 },
             },
         }
@@ -123,6 +149,20 @@ impl Renderable for Meme {
 pub struct TextBubble {
     pub rect: RoundedRect,
     pub text: Text,
+}
+
+impl TextBubble {
+    pub fn from_text(text: Text, color: Color, dimensions: Vector2<f32>, radius: f32) -> Self {
+        TextBubble {
+            rect: RoundedRect {
+                position: text.text_pos,
+                dimensions,
+                color,
+                radius,
+            },
+            text,
+        }
+    }
 }
 
 impl Renderable for TextBubble {

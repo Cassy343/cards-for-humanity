@@ -26,9 +26,6 @@ use ws::WebSocket;
 #[wasm_bindgen]
 pub fn client_main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    spawn_local(async {
-        render_test().await.unwrap();
-    });
 
     let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
     let (packet_pipe, packet_receiver) = mpsc::channel::<ClientBoundPacket>();
@@ -62,7 +59,8 @@ pub fn client_main() {
     socket.onclose(|_socket, event| console_log!("{:?}", event));
     socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
 
-    game_init(socket, Arc::new(packet_receiver));
+    spawn_local(game_init(socket, Arc::new(packet_receiver)));
+    // spawn_local(async {render_test().await.unwrap()});
 }
 
 
@@ -138,7 +136,7 @@ pub async fn render_test() -> Result<(), JsValue> {
     Ok(())
 }
 
-async fn fetch(url: &str) -> Result<String, JsValue> {
+pub async fn fetch(url: &str) -> Result<String, JsValue> {
     let mut options = RequestInit::new();
     options.method("GET");
     options.mode(RequestMode::NoCors);

@@ -1,24 +1,21 @@
-use std::{
-    collections::HashMap,
-    sync::{mpsc::Receiver, Arc, Mutex},
-};
+use std::{borrow::{Borrow, BorrowMut}, cell::RefCell, collections::HashMap, rc::Rc, sync::{mpsc::Receiver, Arc, Mutex}};
 
-use common::{data::cards::{CardID, Prompt, Response}, protocol::{clientbound::ClientBoundPacket, serverbound::ServerBoundPacket}};
+use common::{
+    data::cards::{CardID, Prompt, Response},
+    protocol::{clientbound::ClientBoundPacket, serverbound::ServerBoundPacket},
+};
 use nalgebra::Vector2;
 use uuid::Uuid;
-use wasm_bindgen::{prelude::Closure, JsCast};
+use wasm_bindgen::{JsCast, JsValue, closure::WasmClosure, prelude::Closure};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{HtmlElement, MouseEvent};
+use web_sys::{HtmlCanvasElement, MouseEvent, WebGlRenderingContext};
 
-use crate::{
-    console_log,
-    rendering::{shapes::*, RenderManager, Renderable},
-    ws::WebSocket,
-};
+use crate::{console_log, rendering::{BASE_RESOLUTION, Color, RenderManager, Renderable, shapes::*}, ws::WebSocket};
 
-struct Player {
-    name: String,
-    points: u32,
+#[derive(Clone)]
+pub struct Player {
+    pub name: String,
+    pub points: u32,
 }
 
 enum GameState {
@@ -40,11 +37,11 @@ pub struct GameManager {
     objects: HashMap<String, Box<dyn Renderable>>,
     clickables: Vec<Box<dyn Clickable>>,
     render_manager: RenderManager,
-    socket: Arc<Mutex<WebSocket>>  
+    socket: Arc<Mutex<WebSocket>>,
 }
 
 
-pub fn game_init(socket: WebSocket, packet_receiver: Arc<Receiver<ClientBoundPacket>>) {
+pub async fn game_init(socket: WebSocket, packet_receiver: Arc<Receiver<ClientBoundPacket>>) {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     let webgl_canvas = document.get_element_by_id("webgl").unwrap();
@@ -52,9 +49,11 @@ pub fn game_init(socket: WebSocket, packet_receiver: Arc<Receiver<ClientBoundPac
     let text_canvas = document.get_element_by_id("text").unwrap();
     let text_canvas: web_sys::HtmlCanvasElement = text_canvas.dyn_into().unwrap();
 
+    let render_manager = render_init(&text_canvas, &webgl_canvas).await.unwrap();
+
     let manager = Arc::new(Mutex::new(GameManager {
         player: Player {
-            name: "".to_owned(),
+            name: "Test".to_owned(),
             points: 0,
         },
         id: Uuid::from_u128(0),
@@ -66,15 +65,13 @@ pub fn game_init(socket: WebSocket, packet_receiver: Arc<Receiver<ClientBoundPac
         host: Uuid::from_u128(0),
         objects: HashMap::new(),
         clickables: Vec::new(),
-        render_manager: RenderManager::new(&webgl_canvas, &text_canvas).unwrap(),
-        socket: Arc::new(Mutex::new(socket))
+        render_manager,
+        socket: Arc::new(Mutex::new(socket)),
     }));
 
-    
     let game_manager = manager.clone();
-    
+
     let click_manager = game_manager.clone();
-    let text_canvas: HtmlElement = text_canvas.dyn_into().unwrap();
     let click_callback = Closure::<dyn FnMut(MouseEvent)>::new(move |event: MouseEvent| click_callback(event, click_manager.clone()));
     text_canvas.set_onclick(Some(click_callback.as_ref().unchecked_ref()));
     click_callback.forget();
@@ -86,18 +83,34 @@ pub fn game_init(socket: WebSocket, packet_receiver: Arc<Receiver<ClientBoundPac
         }
     });
 
+
     let draw_manager = manager.clone();
+    spawn_local(async move {
+        draw_loop(draw_manager.clone());
+    });
+}
 
-    let draw_loop = Closure::<dyn FnMut()>::new(move || draw_loop(draw_manager.clone()));
+async fn render_init(
+    text_canvas: &HtmlCanvasElement,
+    webgl_canvas: &HtmlCanvasElement,
+) -> Result<RenderManager, JsValue> {
+    let mut manager = RenderManager::new(webgl_canvas, text_canvas)?;
 
-    web_sys::window()
-        .unwrap()
-        .set_interval_with_callback_and_timeout_and_arguments_0(
-            draw_loop.as_ref().unchecked_ref(),
-            50,
-        )
-        .unwrap();
-    draw_loop.forget();
+    manager.register_shader(
+        "card",
+        &super::fetch("./shaders/card.vert")
+            .await
+            .expect("error getting shader"),
+        &super::fetch("./shaders/card.frag")
+            .await
+            .expect("error getting shader"),
+        WebGlRenderingContext::TRIANGLE_STRIP,
+    )?;
+
+    manager.set_background_color(Color::from_rgb(0x1e, 0x34, 0x54));
+    manager.clear();
+
+    Ok(manager)
 }
 
 fn game_loop(manager: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
@@ -133,11 +146,13 @@ fn game_loop(manager: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                         &card.text,
                         card.id,
                         Vector2::new((20 + (hand_len + i) * 30) as f32, 500.0),
-                        Vector2::new(20.0, 30.0),
+                        Vector2::new(50.0, 70.0),
                     )
                 }));
 
-            manager.objects.remove("prompt_card").unwrap();
+            if manager.objects.contains_key("prompt_card") {
+                manager.objects.remove("prompt_card").unwrap();
+            }
 
             manager.state = GameState::MakeResponse(prompt);
         }
@@ -147,16 +162,36 @@ fn game_loop(manager: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             );
         }
         ClientBoundPacket::StartGame => {}
-        _ => unimplemented!(),
+        _ => {}
     }
 }
 
 fn draw_loop(manager: Arc<Mutex<GameManager>>) {
-    let mut manager = manager.lock().unwrap();
+    console_log!("getting manager");
+    let mut manager = match manager.lock() {
+        Ok(m) => m,
+        Err(e) => {
+            console_log!("Error getting manager: {}", e);
+            return;
+        }
+    };
 
+    manager.render_manager.clear();
+
+    console_log!("drawing objects");
     manager
         .render_manager
         .draw_object(&manager.hand as &dyn Renderable)
+        .unwrap();
+
+    console_log!("{}", manager.player.name);
+
+    let mut players: Vec<_> = manager.others.values().map(|c| c.clone()).collect();
+    players.push(manager.player.clone());
+
+    manager
+        .render_manager
+        .draw_object(&players as &dyn Renderable)
         .unwrap();
 
     match &manager.state {
@@ -186,7 +221,10 @@ fn draw_loop(manager: Arc<Mutex<GameManager>>) {
                     .map(|(i, v)| {
                         ResponseCard::new(
                             v,
-                            CardID {card_number: 0, pack_number: 0},
+                            CardID {
+                                card_number: 0,
+                                pack_number: 0,
+                            },
                             Vector2::new(20. + i as f32 * 50., 50.),
                             Vector2::new(20.0, 30.0),
                         )
@@ -213,62 +251,84 @@ fn draw_loop(manager: Arc<Mutex<GameManager>>) {
 }
 
 fn click_callback(event: MouseEvent, manager: Arc<Mutex<GameManager>>) {
+    console_log!("running click checks");
 
+    let pos = Vector2::new(event.client_x() as f32, event.client_y()as f32).component_div(&Vector2::from(BASE_RESOLUTION));
+
+    let manager = manager.lock().unwrap();
+
+    for clickable in &manager.clickables {
+        if clickable.click_check(pos) {
+            clickable.click(&manager, pos).unwrap();
+        };
+    }
+
+    for card in &manager.hand {
+        if card.click_check(pos) {
+            card.click(&manager, pos).unwrap();
+        }
+    }
 }
 
 
 type Hand = Vec<ResponseCard>;
 
 pub trait Clickable {
-    fn click_check(&self, pos: Vector2<i32>) -> bool;
-    fn click(&self, manager: GameManager, pos: Vector2<i32>) -> Result<(), String>;
+    fn click_check(&self, pos: Vector2<f32>) -> bool;
+    fn click(&self, manager: &GameManager, pos: Vector2<f32>) -> Result<(), String>;
 }
 
 impl Clickable for RoundedRect {
-    fn click_check(&self, pos: Vector2<i32>) -> bool {
-        pos.x >= self.position.x as i32
-            && pos.x <= (self.position.x + self.dimensions.x) as i32
-            && pos.y >= self.position.y as i32
-            && pos.y <= (self.position.y + self.dimensions.y) as i32
+    fn click_check(&self, pos: Vector2<f32>) -> bool {
+        console_log!("click pos: {}\nour pos: {}", pos, self.position);
+        pos.x >= self.position.x
+            && pos.x <= (self.position.x + self.dimensions.x)
+            && pos.y >= self.position.y
+            && pos.y <= (self.position.y + self.dimensions.y)
     }
 
-    fn click(&self, _: GameManager, _: Vector2<i32>) -> Result<(), String> {
+    fn click(&self, _: &GameManager, _: Vector2<f32>) -> Result<(), String> {
+        console_log!("I've been clicked :O");
         Ok(())
     }
 }
 
 impl Clickable for TextBubble {
-    fn click_check(&self, pos: Vector2<i32>) -> bool {
+    fn click_check(&self, pos: Vector2<f32>) -> bool {
         self.rect.click_check(pos)
     }
 
-    fn click(&self, _: GameManager, _: Vector2<i32>) -> Result<(), String> {
+    fn click(&self, _: &GameManager, _: Vector2<f32>) -> Result<(), String> {
+        console_log!("{} was clicked", self.text.text);
         Ok(())
     }
 }
 
 impl Clickable for ResponseCard {
-    fn click_check(&self, pos: Vector2<i32>) -> bool {
+    fn click_check(&self, pos: Vector2<f32>) -> bool {
         self.inner.click_check(pos)
     }
 
-    fn click(&self, manager: GameManager, _: Vector2<i32>) -> Result<(), String> {
-        
+    fn click(&self, manager: &GameManager, _: Vector2<f32>) -> Result<(), String> {
         match manager.state {
             // There should be no cards on the lobby and if there are they shouldn't do anything
-            GameState::Lobby => {},
-            GameState::MakeResponse(_) => {
+            GameState::Lobby => {}
+            GameState::MakeResponse(_) =>
                 if !manager.is_czar {
                     let socket = manager.socket.lock().unwrap();
-                    socket.send_packet(&ServerBoundPacket::SelectResponse(self.id)).unwrap();
-                }
-            },
-            GameState::PickResponse(_) => {
+                    socket
+                        .send_packet(&ServerBoundPacket::SelectResponse(self.id))
+                        .unwrap();
+                },
+            GameState::PickResponse(_) =>
                 if manager.is_czar {
                     let socket = manager.socket.lock().unwrap();
-                    socket.send_packet(&ServerBoundPacket::SelectRoundWinner(((self.inner.rect.position.x - 20.0) / 50.0) as usize)).unwrap();
-                }
-            },
+                    socket
+                        .send_packet(&ServerBoundPacket::SelectRoundWinner(
+                            ((self.inner.rect.position.x - 20.0) / 50.0) as usize,
+                        ))
+                        .unwrap();
+                },
             // Don't do anything if we're just waiting
             // In future could allow you to highlight cards or smth?
             GameState::Waiting => {}
