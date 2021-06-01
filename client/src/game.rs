@@ -1,17 +1,16 @@
-use std::{borrow::{Borrow, BorrowMut}, cell::RefCell, collections::HashMap, rc::Rc, sync::{mpsc::Receiver, Arc, Mutex}};
+use std::{collections::HashMap,sync::{mpsc::Receiver, Arc, Mutex}};
 
 use common::{
     data::cards::{CardID, Prompt, Response},
     protocol::{clientbound::ClientBoundPacket, serverbound::ServerBoundPacket},
 };
 use uuid::Uuid;
-use wasm_bindgen::{JsCast, JsValue, closure::WasmClosure, prelude::*};
-use wasm_bindgen_futures::spawn_local;
-use web_sys::{HtmlCanvasElement, MouseEvent, WebGlRenderingContext};
+use wasm_bindgen::{prelude::*};
 
 use serde::{Serialize, Deserialize};
 
-use crate::{console_log, js_imports::update_black_card, ws::WebSocket};
+use crate::{console_log, ws::WebSocket};
+
 
 #[derive(Clone)]
 pub struct Player {
@@ -88,19 +87,15 @@ fn game_loop(manager: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
         } => {
             manager.is_czar = is_czar;
 
-            let hand_len = manager.hand.len();
             manager
                 .hand
-                .extend(new_responses.iter().enumerate().map(|(i, card)| {
+                .extend(new_responses.iter().map(|card| {
                     ResponseCard {
                         text: card.text.clone(),
                         id: card.id,
                     }
                 }));
 
-            update_black_card(PromptCard {
-                text: prompt.text.clone()
-            });
             manager.state = GameState::MakeResponse(prompt);
         }
         ClientBoundPacket::DisplayResponses(responses) => {

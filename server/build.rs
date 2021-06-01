@@ -16,16 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     copy_client_file(&mut zip_writer, "client.js")?;
     copy_client_file(&mut zip_writer, "client_bg.wasm")?;
 
-    zip_writer.add_directory("www/client/snippets/frontend/dist/", Default::default())?;
-    copy_client_file(&mut zip_writer, "snippets/frontend/dist/app.js")?;
-    // copy_client_file(&mut zip_writer, )
 
     zip_writer.finish()?;
 
     println!("cargo:rerun-if-changed=../target/client-out/");
     println!("cargo:rerun-if-changed=../client/");
     println!("cargo:rerun-if-changed=./www/");
-    println!("cargo:rerun-if-changed=../frontend/");
     Ok(())
 }
 
@@ -41,9 +37,9 @@ fn add_directory_recursively(
         let path = entry.path();
         let path_string = path.to_str().unwrap();
         if path.is_dir() {
-            zip_writer.add_directory(path_string.replace("../frontend/dist/", "www/"), Default::default())?;
+            zip_writer.add_directory(path_string, Default::default())?;
         } else {
-            zip_writer.start_file(path_string.replace("../frontend/dist/", "www/"), Default::default())?;
+            zip_writer.start_file(path_string, Default::default())?;
             copy(&mut File::open(path)?, zip_writer)?;
         }
     }

@@ -28,11 +28,28 @@
         </script>
 
         <script type='module'>
+
+            export function update_black_card(black_card) {
+                global_var.update_black_card(black_card);
+            }
+
+            export function update_played_cards(played_cards) {
+                global_var.update_played_cards(played_cards);
+            }
+
+            export function update_hand(hand) {
+                global_var.update_hand(hand)
+            }
+
             import init, { client_main } from './client/client.js';
 
             async function run() {
                 await init(new URL('./client/client_bg.wasm', import.meta.url));
-                client_main();
+                
+                // Wait for us to connect before giving rust the socket
+                // while(!global_var.socket) {}
+
+                client_main(global_var.socket);
             }
 
             run();
