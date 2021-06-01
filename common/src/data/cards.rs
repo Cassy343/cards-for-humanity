@@ -20,6 +20,7 @@ impl CardID {
             card_number,
         }
     }
+    // proc macro server crashed
 }
 
 #[derive(Serialize, Deserialize)]
