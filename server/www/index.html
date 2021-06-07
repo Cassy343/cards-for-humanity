@@ -4,52 +4,18 @@
         <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
         <title>Cards for Humanity</title>
         <link rel="stylesheet" href="stylesheet.css">
-        <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
-        <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-        <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
     </head>
 
     <body>
-        <!-- <div id="canvas-container">
-            <canvas id="webgl">Webgl Render Layer</canvas>
-            <canvas id="text">Text Render Layer</canvas>
-        </div> -->
-        <script src="app.js"></script>
-        <script src="board.js"></script>
-        <script src="card.js"></script>
-        <script src="game.js"></script>
-        <script src="hand.js"></script>
-        <div id="root">
 
-        </div>
-
-        <script type="text/babel">
-            ReactDOM.render(<App />, document.getElementById('root'))
-        </script>
-
+        <div id="root"></div>
         <script type='module'>
-
-            export function update_black_card(black_card) {
-                global_var.update_black_card(black_card);
-            }
-
-            export function update_played_cards(played_cards) {
-                global_var.update_played_cards(played_cards);
-            }
-
-            export function update_hand(hand) {
-                global_var.update_hand(hand)
-            }
-
             import init, { client_main } from './client/client.js';
 
             async function run() {
                 await init(new URL('./client/client_bg.wasm', import.meta.url));
-                
-                // Wait for us to connect before giving rust the socket
-                // while(!global_var.socket) {}
 
-                client_main(global_var.socket);
+                client_main();
             }
 
             run();

@@ -1,23 +1,102 @@
-* {
-    margin: 0;
-    padding: 0;
+.card {
+    border-radius: 25px;
+    border-style: solid;
+    padding: 30px;
+    padding-top: 10px;
+    margin-left: 10px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    width: 120px;
+    min-height: 140px;
+    font-size: 90%;
 }
 
-html, body {
-    width: 100%;
-    height: 100%;
+@keyframes card-shadow {
+    from {box-shadow: 0px 0px 0rem black}
+    
+    to {box-shadow: 0px 5px 0.5rem black}
 }
 
-#canvas-container {
-    display: block;
-    position: relative;
+.card:hover {
+    box-shadow: 0px 3px 0.5rem black;
+    animation-name: card-shadow;
+    animation-duration: 0.5s;
 }
 
-canvas {
-    display: block;
-    position: absolute;
+.white-card {
+    border-color: black;
+    background: white;
 }
 
-#text {
-    background-color: transparent;
+.black-card-div {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.black-card {
+    background-color: black;
+    color: white;
+    border-color: black;
+}
+
+.hand {
+    border-top-style: none;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.played {
+    border-bottom-style: none;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.holder {
+    background: #f4f2e8;
+    border-color: black;
+    border-style: solid;
+    border-width: 2px;
+}
+
+.played-cards {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.player-responses {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.footer {
+    border-top-style: none;
+    font-size: 20px
+}
+
+.user-points {
+    margin-left: 10px
+}
+
+.players-list {
+    display: flex;
+    flex-direction: row;
+    border-bottom-style: none;
+}
+
+.player {
+    border-right: black solid 2px;
+    padding: 3px;
+}
+
+.picked {
+    background-color: greenyellow;
+}
+
+.czar {
+    background-color: lightslategray;
 }

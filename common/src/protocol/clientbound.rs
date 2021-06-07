@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{serverbound::ServerBoundPacket, GameSetting};
+use super::GameSetting;
 use crate::data::cards::{CardID, Prompt, Response};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -25,9 +25,9 @@ pub enum ClientBoundPacket {
         new_host: Option<usize>,
     },
     PlayerFinishedPicking(usize),
-    DisplayResponses(HashMap<usize, Vec<Response>>),
+    DisplayResponses(HashMap<usize, Vec<ResponseData>>),
     NextRound {
-        is_czar: bool,
+        czar: usize,
         prompt: Prompt,
         new_responses: Vec<ResponseData>,
     },

@@ -4,7 +4,7 @@ use super::GameSetting;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum WrappedServerBoundPacket {
     Raw(ServerBoundPacket),
@@ -30,7 +30,7 @@ impl WrappedServerBoundPacket {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerBoundPacket {
     SetPlayerName(String),
     StartGame,

@@ -13,6 +13,7 @@ wasm-bindgen = { version = "0.2.74", features = ["nightly", "serde-serialize"] }
 wasm-bindgen-futures = "0.4.24"
 console_error_panic_hook = "0.1.6"
 uuid = { version = "0.8.2", features = ["wasm-bindgen"] }
+wasm_thread = "0.1.4"
 
 [lib]
 crate-type =["cdylib"]
@@ -23,6 +24,7 @@ features = [
     'Document',
     'Element',
     'HtmlElement',
+    'HtmlCollection',
     'Window',
     'WebSocket',
     'console',
@@ -34,5 +36,6 @@ features = [
     'Request',
     'RequestInit',
     'RequestMode',
-    'EventTarget'
+    'EventTarget',
+    'DomTokenList'
 ]

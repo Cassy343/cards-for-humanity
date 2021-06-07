@@ -22,13 +22,13 @@ macro_rules! set_handler {
 pub struct WebSocket(Arc<WebSysSocket>);
 
 impl WebSocket {
-
-    pub fn new(socket: WebSysSocket) -> Self {
-        WebSocket(Arc::new(socket))
-    }
-
     pub fn connect<S: AsRef<str> + ?Sized>(url: &S) -> Result<Self, SocketError> {
         Ok(WebSocket(Arc::new(WebSysSocket::new(url.as_ref())?)))
+    }
+
+    #[allow(dead_code)]
+    pub fn close(self) -> Result<(), JsValue> {
+        self.0.close()
     }
 
     pub fn onopen<F>(&self, mut callback: F)
@@ -54,6 +54,7 @@ impl WebSocket {
         set_handler!(self, ErrorEvent, set_onerror, callback)
     }
 
+    #[allow(dead_code)]
     pub fn send_packet<P: Serialize>(&self, packet: &P) -> Result<(), SocketError> {
         self.send_packets(&[packet])
     }

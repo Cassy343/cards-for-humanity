@@ -1,29 +1,26 @@
 #![feature(unsize)]
 
-mod game;
-// mod rendering;
-mod ws;
-
 #[macro_use]
 mod console;
+mod game;
+mod html;
+mod ws;
 
-use std::sync::{Arc, mpsc};
 use common::protocol::{clientbound::ClientBoundPacket, decode};
-use wasm_bindgen::{prelude::*, JsCast};
-use wasm_bindgen_futures::*;
-use web_sys::{Request, RequestInit, RequestMode, Response};
+use std::sync::mpsc;
+use wasm_bindgen::prelude::*;
 use ws::WebSocket;
 
 use crate::game::game_init;
 
 #[wasm_bindgen]
 pub fn client_main() {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_error_panic_hook::set_once();
 
     let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
     let (packet_pipe, packet_receiver) = mpsc::channel::<ClientBoundPacket>();
 
-    socket.onopen(|socket| {
+    socket.onopen(move |socket| {
         console_log!("Socket opened");
         let _ =
             socket.send_packet_with_id(common::protocol::serverbound::ServerBoundPacket::StartGame);
@@ -52,25 +49,5 @@ pub fn client_main() {
     socket.onclose(|_socket, event| console_log!("{:?}", event));
     socket.onerror(|_socket, event| console_error!("WebSocket error: {}", event.message()));
 
-    spawn_local(game_init(socket, Arc::new(packet_receiver)));
-}
-
-pub async fn fetch(url: &str) -> Result<String, JsValue> {
-    let mut options = RequestInit::new();
-    options.method("GET");
-    options.mode(RequestMode::NoCors);
-    let req = Request::new_with_str_and_init(url, &options)?;
-
-    let window = web_sys::window().unwrap();
-    let request_promise = window.fetch_with_request(&req);
-    let future = JsFuture::from(request_promise);
-
-    let response = future.await?;
-    let response: Response = response.dyn_into()?;
-
-    let text_future = JsFuture::from(response.text()?);
-    let text = text_future.await?;
-    Ok(text
-        .as_string()
-        .expect("Response.text() did not return a String and did not error"))
+    game_init(socket, packet_receiver)
 }

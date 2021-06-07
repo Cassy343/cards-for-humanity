@@ -6,7 +6,7 @@ use common::protocol::{
     serverbound::{ServerBoundPacket, WrappedServerBoundPacket},
 };
 use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
-use log::{error, warn};
+use log::{debug, error, warn};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use tokio::sync::Mutex;
 use warp::ws::Message;
@@ -74,6 +74,7 @@ impl NetworkHandler {
                                 .borrow_mut()
                                 .handle_packet(self, packet.packet(), client_id)
                                 .await;
+                            debug!("response {:?} to {:?}", response, packet);
                             if let Some(id) = packet.packet_id() {
                                 acknowledgements.push((id, response));
                             }
