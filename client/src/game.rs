@@ -239,8 +239,6 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             if let Some(host_id) = new_host {
                 manager.host = Uuid::from_u128(host_id as u128)
             }
-
-            remove_player(Uuid::from_u128(id as u128));
         }
 
         ClientBoundPacket::PlayerFinishedPicking(id) =>

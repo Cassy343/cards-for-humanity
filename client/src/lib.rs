@@ -17,7 +17,8 @@ use crate::game::game_init;
 pub fn client_main() {
     console_error_panic_hook::set_once();
 
-    let socket = WebSocket::connect("ws://127.0.0.1:8080/ws").unwrap();
+    let host = web_sys::window().unwrap().location().host().unwrap();
+    let socket = WebSocket::connect(&format!("ws://{}/ws", host)).unwrap();
     let (packet_pipe, packet_receiver) = mpsc::channel::<ClientBoundPacket>();
 
     socket.onopen(move |socket| {

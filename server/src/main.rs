@@ -120,7 +120,7 @@ async fn start_server(client_handler: Arc<Mutex<ClientHandler>>) -> Sender<()> {
     let (shutdown_hook, rx) = oneshot::channel::<()>();
 
     let (_addr, server) =
-        warp::serve(www.or(ws_server)).bind_with_graceful_shutdown(([127, 0, 0, 1], 8080), async {
+        warp::serve(www.or(ws_server)).bind_with_graceful_shutdown(([0, 0, 0, 0], 25565), async {
             rx.await.ok();
         });
 

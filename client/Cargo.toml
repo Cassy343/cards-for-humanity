@@ -37,5 +37,6 @@ features = [
     'RequestInit',
     'RequestMode',
     'EventTarget',
-    'DomTokenList'
+    'DomTokenList',
+    'Location'
 ]
