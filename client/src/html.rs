@@ -124,7 +124,11 @@ pub fn add_server(server_id: usize, num_players: usize, max_players: Option<usiz
         span.set_hidden(false);
     }
 
-    server_list.last_element_child().unwrap().dyn_into().unwrap()
+    server_list
+        .last_element_child()
+        .unwrap()
+        .dyn_into()
+        .unwrap()
 }
 
 pub fn get_name_input() -> HtmlElement {
@@ -248,10 +252,18 @@ pub fn current_packs() -> Vec<String> {
 pub fn get_settings() -> GameSettings {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
-    let max_players_ele: HtmlInputElement = document.get_element_by_id("max-players").unwrap().dyn_into().unwrap();
+    let max_players_ele: HtmlInputElement = document
+        .get_element_by_id("max-players")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
     // let max_time_ele: HtmlInputElement = document.get_element_by_id("max-time").unwrap().dyn_into().unwrap();
-    let points_ele: HtmlInputElement = document.get_element_by_id("points").unwrap().dyn_into().unwrap();
-    
+    let points_ele: HtmlInputElement = document
+        .get_element_by_id("points")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
+
     let max_players = max_players_ele.value().parse().ok();
     // let max_time = max_time_ele.value().parse().ok();
     let points = points_ele.value().parse().unwrap();
@@ -262,7 +274,7 @@ pub fn get_settings() -> GameSettings {
         max_players,
         // Since we don't support max_selection_time yet we don't enable it
         max_selection_time: None,
-        points_to_win: points
+        points_to_win: points,
     }
 }
 

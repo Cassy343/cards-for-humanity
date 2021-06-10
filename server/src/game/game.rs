@@ -35,9 +35,13 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(id: usize, pack_store: Rc<RefCell<PackStore>>, settings: GameSettings) -> Result<Self, String> {
+    pub fn new(
+        id: usize,
+        pack_store: Rc<RefCell<PackStore>>,
+        settings: GameSettings,
+    ) -> Result<Self, String> {
         let mut loaded_packs = Vec::new();
-        
+
         for pack_name in settings.packs {
             loaded_packs.push(pack_store.borrow_mut().load_pack(&pack_name)?)
         }

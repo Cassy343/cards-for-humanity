@@ -4,7 +4,10 @@ use common::protocol::serverbound::ServerBoundPacket;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::HtmlElement;
 
-use crate::{game::{GameManager, GameState}, html::{get_name_input, get_name_input_value, get_settings, init_game, set_user_name}};
+use crate::{
+    game::{GameManager, GameState},
+    html::{get_name_input, get_name_input_value, get_settings, init_game, set_user_name},
+};
 
 pub fn register_events(manager: Arc<Mutex<GameManager>>) {
     let window = web_sys::window().unwrap();
@@ -25,8 +28,16 @@ pub fn register_events(manager: Arc<Mutex<GameManager>>) {
 
     input_change.forget();
 
-    let create_game_button: HtmlElement = document.get_element_by_id("finish-game-button").unwrap().dyn_into().unwrap();
-    let start_game_button: HtmlElement = document.get_element_by_id("game-start-button").unwrap().dyn_into().unwrap();
+    let create_game_button: HtmlElement = document
+        .get_element_by_id("finish-game-button")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
+    let start_game_button: HtmlElement = document
+        .get_element_by_id("game-start-button")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
     let start_game_button_clone = start_game_button.clone();
     let create_game_manager = manager.clone();
 
@@ -34,17 +45,22 @@ pub fn register_events(manager: Arc<Mutex<GameManager>>) {
         let manager_arc = create_game_manager.clone();
         let mut manager = manager_arc.lock().unwrap();
         let socket = manager.socket.lock().unwrap();
-        let id = socket.send_packet_with_id(ServerBoundPacket::CreateServer(get_settings())).unwrap();
+        let id = socket
+            .send_packet_with_id(ServerBoundPacket::CreateServer(get_settings()))
+            .unwrap();
         drop(socket);
-        manager.packet_cache.insert(id, crate::game::CachedPacket::CreateServer(start_game_button_clone.clone()));
+        manager.packet_cache.insert(
+            id,
+            crate::game::CachedPacket::CreateServer(start_game_button_clone.clone()),
+        );
     });
 
     create_game_button.set_onclick(Some(create_game_click.as_ref().unchecked_ref()));
     create_game_click.forget();
-    
+
     let start_game_button_clone = start_game_button.clone();
     let start_game_manager = manager.clone();
-    
+
     let start_game_click = Closure::<dyn FnMut()>::new(move || {
         let manager_arc = start_game_manager.clone();
         let manager = manager_arc.lock().unwrap();

@@ -18,7 +18,35 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::HtmlElement;
 
-use crate::{console_log, html::{add_card_to_hand, add_packs, add_player, add_server, clear_player_marks, clear_response_cards, clear_servers, get_hand_element, get_name_input_value, init_game, init_lobby, mark_player_czar, mark_player_played, place_blank_response, remove_card_from_hand, remove_player, set_player_responses, set_prompt_card, set_user_name, set_user_points, update_player_name, update_player_points}, js_events::register_events, ws::WebSocket};
+use crate::{
+    console_log,
+    html::{
+        add_card_to_hand,
+        add_packs,
+        add_player,
+        add_server,
+        clear_player_marks,
+        clear_response_cards,
+        clear_servers,
+        get_hand_element,
+        get_name_input_value,
+        init_game,
+        init_lobby,
+        mark_player_czar,
+        mark_player_played,
+        place_blank_response,
+        remove_card_from_hand,
+        remove_player,
+        set_player_responses,
+        set_prompt_card,
+        set_user_name,
+        set_user_points,
+        update_player_name,
+        update_player_points,
+    },
+    js_events::register_events,
+    ws::WebSocket,
+};
 
 
 #[derive(Clone)]
@@ -40,7 +68,7 @@ pub enum CachedPacket {
     SelectResponse(ResponseCard, usize),
     SelectRoundWinner,
     JoinGame,
-    CreateServer(HtmlElement)
+    CreateServer(HtmlElement),
 }
 
 pub struct GameManager {
@@ -65,7 +93,6 @@ pub struct GameManager {
 
 
 pub fn game_init(socket: WebSocket, packet_receiver: Receiver<ClientBoundPacket>) {
-
     // Get the value of the name input because the browser can save it so we can't just detect it on change
     let name = get_name_input_value();
     set_user_name(&name);
@@ -201,12 +228,11 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             set_user_points(manager.player.points);
         }
 
-        ClientBoundPacket::UpdatePlayerName { id, name } => {
+        ClientBoundPacket::UpdatePlayerName { id, name } =>
             if id != manager.id {
                 update_player_name(id, &name);
                 manager.others.get_mut(&id).unwrap().name = name;
-            }
-        }
+            },
 
         ClientBoundPacket::RemovePlayer { id, new_host } => {
             remove_player(id);
@@ -276,7 +302,11 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                         CachedPacket::JoinGame => {
                             manager.server_closures = Vec::new();
                             let socket = manager.socket.lock().unwrap();
-                            socket.send_packet(&ServerBoundPacket::SetPlayerName(manager.player.name.clone())).unwrap();
+                            socket
+                                .send_packet(&ServerBoundPacket::SetPlayerName(
+                                    manager.player.name.clone(),
+                                ))
+                                .unwrap();
                             init_game();
                             clear_servers();
                         }
@@ -284,7 +314,11 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                         CachedPacket::CreateServer(ele) => {
                             manager.state = GameState::Waiting;
                             let socket = manager.socket.lock().unwrap();
-                            socket.send_packet(&ServerBoundPacket::SetPlayerName(manager.player.name.clone())).unwrap();
+                            socket
+                                .send_packet(&ServerBoundPacket::SetPlayerName(
+                                    manager.player.name.clone(),
+                                ))
+                                .unwrap();
                             init_game();
                             ele.set_hidden(false);
                         }
@@ -459,7 +493,9 @@ fn set_server_onclick(element: HtmlElement, server_id: usize, manager: Arc<Mutex
 fn server_click(server_id: usize, manager: Arc<Mutex<GameManager>>) {
     let mut manager = manager.lock().unwrap();
     let socket = manager.socket.lock().unwrap();
-    let id = socket.send_packet_with_id(ServerBoundPacket::JoinGame(server_id)).unwrap();
+    let id = socket
+        .send_packet_with_id(ServerBoundPacket::JoinGame(server_id))
+        .unwrap();
     drop(socket);
     manager.packet_cache.insert(id, CachedPacket::JoinGame);
 }

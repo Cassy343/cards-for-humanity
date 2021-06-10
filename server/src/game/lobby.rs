@@ -35,7 +35,8 @@ impl Listener for Lobby {
 
         let mut client_handler = network_handler.client_handler.lock().await;
 
-        match client_handler.send_packet(client_id, &ClientBoundPacket::ServerList {
+        match client_handler
+            .send_packet(client_id, &ClientBoundPacket::ServerList {
                 servers: games
                     .iter()
                     .map(|g| (g.id, g.num_players(), g.max_players))
@@ -47,7 +48,13 @@ impl Listener for Lobby {
             _ => {}
         };
 
-        match client_handler.send_packet(client_id, &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_pack_names())).await {
+        match client_handler
+            .send_packet(
+                client_id,
+                &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_pack_names()),
+            )
+            .await
+        {
             Some(Err(e)) => warn!("Error sending card packs to client: {}", e),
             _ => {}
         }
@@ -93,12 +100,12 @@ impl Listener for Lobby {
                     self.pack_store.clone(),
                     settings.clone(),
                 ) {
-                    Ok(g) => {
-                        Rc::new(RwLock::new(g))
-                    },
+                    Ok(g) => Rc::new(RwLock::new(g)),
                     Err(e) => {
                         warn!("Error making new game {}", e);
-                        return PacketResponse::RejectedWithReason("Error creating new game".to_owned())
+                        return PacketResponse::RejectedWithReason(
+                            "Error creating new game".to_owned(),
+                        );
                     }
                 };
 
@@ -107,7 +114,7 @@ impl Listener for Lobby {
 
                 match network_handler.forward_client(sender_id, listener_id).await {
                     Some(_) => PacketResponse::Accepted,
-                    None => PacketResponse::Rejected
+                    None => PacketResponse::Rejected,
                 }
             }
 
@@ -118,7 +125,7 @@ impl Listener for Lobby {
 
                 match network_handler.forward_client(sender_id, *server_id).await {
                     Some(_) => PacketResponse::Accepted,
-                    None => PacketResponse::Rejected
+                    None => PacketResponse::Rejected,
                 }
             }
 

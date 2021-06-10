@@ -244,8 +244,17 @@ impl NetworkHandler {
     }
 
     pub async fn forward_client(&mut self, client_id: usize, listener_id: usize) -> Option<()> {
-        self.client_handler.lock().await.get_client_mut(client_id)?.listener = listener_id;
-        self.listeners.get(&listener_id)?.clone().borrow_mut().client_connected(self, client_id).await;
+        self.client_handler
+            .lock()
+            .await
+            .get_client_mut(client_id)?
+            .listener = listener_id;
+        self.listeners
+            .get(&listener_id)?
+            .clone()
+            .borrow_mut()
+            .client_connected(self, client_id)
+            .await;
         Some(())
     }
 }

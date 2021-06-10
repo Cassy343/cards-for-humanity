@@ -165,7 +165,7 @@ pub struct Client {
     pub id: usize,
     connection: UnboundedSender<Message>,
     address: Option<SocketAddr>,
-    pub listener: usize
+    pub listener: usize,
 }
 
 impl Client {
@@ -179,7 +179,7 @@ impl Client {
             id,
             connection,
             address,
-            listener
+            listener,
         }
     }
 
