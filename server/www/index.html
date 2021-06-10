@@ -8,7 +8,214 @@
 
     <body>
 
-        <div id="root"></div>
+        <div id="root">
+            <div id="settings-menu" class="settings-menu holder" hidden>
+                <div class="settings box">
+                    <div>Max Players: <input type="number" id="max-players"></input></div>
+                    <div>Max Selection Time: <input type="number" id="max-time"></input></div>
+                    <div>Points to win: <input type="number" id="points" value="10"></input></div>
+                </div>
+                <div class="pack-settings box">
+                    <div class="pack-selection tall-box">
+                        Possible Packs
+                        <select id="new-packs" multiple></select>
+                        <div id="new-packs-button" class="button">Add Packs</div>
+                    </div>
+                    <div class="pack-selection tall-box">
+                        Current Packs
+                        <select id="old-packs" multiple></select>
+                        <div id="old-packs-button" class="button">Remove Packs</div>
+                    </div>
+                </div>
+                <div id="create-game" hidden>
+                    <div class="box">
+                        <div id="cancel-game" class="button">Cancel</div>
+                        <div id="finish-game-button" class="button">Create Game</div>
+                    </div>
+                </div>
+                <div id="update-settings">
+                    <div class="box">
+                        <div id="cancel-settings" class="button">Cancel</div>
+                        <div id="save-settings" class="button">Save</div>
+                    </div>
+                </div>
+            </div>
+            <div id="shadow" hidden></div>
+            <div id="lobby">
+                <div class="tall-box holder">
+                    <div id="server-list" class="server-list"></div>
+                    <input id="player-name-input-lobby"></input>
+                    <div id="create-game-button" class="button">Create New Game</div>
+                </div>
+            </div>
+            <div id="game" class="game" hidden>
+                <div id="players-list", class="players-list holder box"></div>
+                <div id="played-div" class="played holder box">
+                        <div id="black-card-div" class="black-card-div box"></div>
+                        <div id="played-cards" class="played-cards box"></div>
+                </div>
+                <div id="hand" class="hand holder box"></div>
+                <div id="footer" class="footer holder">
+                    <div id="game-settings-button" class="button">Settings</div>
+                    <div id="game-start-button" class="button" hidden>Start Game</div>
+                    <span id="user-name" class="user-name"></span>
+                    <span id="user-points" class="user-points"></span> Points
+                </div>
+            </div>
+        </div>
+        <script>
+            // Exported functions to be used in Rust
+            // functions are written in JS because working w/ HTML is easier in JS
+            function get_selected_packs(new_packs) {
+                let ele;
+                if(new_packs)
+                    ele = document.getElementById("new-packs");
+                else
+                    ele = document.getElementById("old-packs");
+
+                let output = [];
+                
+                for(child of ele.options)
+                    if(child.selected)
+                        output.push(child.value)
+                
+                return output;
+            }
+
+            function get_current_packs() {
+                let values = [];
+
+                for(child of document.getElementById("old-packs").children) {
+                    values.push(child.value);
+                }
+
+                return values;
+            }
+
+            function add_pack(new_pack) {
+                let element = document.getElementById("new-packs");
+                element.innerHTML += `<option value="${new_pack}">${new_pack}</option>`;
+            }
+
+            function move_pack(pack, to_current) {
+                let possible_packs;
+                let current_packs;
+
+                if(to_current) {
+                    possible_packs = document.getElementById("new-packs");
+                    current_packs = document.getElementById("old-packs");
+                } else {
+                    current_packs = document.getElementById("new-packs");
+                    possible_packs = document.getElementById("old-packs");
+                }
+
+                possible_packs.innerHTML.replace(`<option value="${pack}">${pack}</option>`, '');
+                current_packs.innerHTML += `<option value="${pack}">${pack}</option>`;
+            }
+        
+            function set_user_points(points) {
+                document.getElementById("user-points").innerHTML = points;
+            }
+
+            function set_user_name(name) {
+                document.getElementById("user-name").innerHTML = name;
+            }
+            
+            function clear_player_marks(id) {
+                document.getElementById(`player-${id}`).classList.remove("czar", "picked");
+            }
+
+            function mark_player_played(id) {
+                document.getElementById(`player-${id}`).classList.add("picked");
+            }
+            
+            function mark_player_czar(id) {
+                document.getElementById(`player-${id}`).classList.add("czar");
+            }
+
+            function update_player_points(id, points) {
+                document.getElementById(`player-${id}-points`).innerHTML = points;
+            }
+
+            function update_player_name(id, name) {
+                document.getElementById(`player-${id}-name`).innerHTML = name;
+            }
+
+            function remove_player(id) {
+                document.getElementById(`player-${id}`).remove();
+            }
+
+            function remove_card_from_hand(index) {
+                document.getElementById("hand").children[index].remove();
+            }
+
+            function clear_response_cards() {
+                document.getElementById("played-cards").innerHTML = "";
+            }
+
+            function place_blank_response() {
+                document.getElementById("played-cards").innerHTML += `<div class="white-card card"></div>`;
+            }
+
+            function clear_servers() {
+                document.getElementById("server-list").innerHTML = "";
+            }
+
+            // Events registered after the page has finished loading
+            (() => {
+                const settings_div = document.getElementById("settings-menu");
+                const create_settings_div = document.getElementById("create-game");
+                const update_settings_div = document.getElementById("update-settings");
+                const shadow_div = document.getElementById('shadow');
+                let interactible = true;
+
+                document.getElementById("create-game-button").onclick = () => {
+                    if(!interactible) return;
+                    if(!document.getElementById("player-name-input-lobby").value.trim()) {
+                        alert("You need a name before you can create a game");
+                    } else {
+                        settings_div.hidden = false;
+                        update_settings_div.hidden = true;
+                        create_settings_div.hidden = false;
+                        shadow_div.hidden = false;
+                    }
+                };
+
+                document.getElementById("cancel-game").onclick = () => {
+                    settings_div.hidden = true;
+                    shadow_div.hidden = true;
+                };
+
+                document.getElementById("cancel-settings").onclick = () => {
+                    settings_div.hidden = true;
+                    shadow_div.hidden = true;
+                };
+
+                document.getElementById("game-settings-button").onclick = () => {
+                    if(!interactible) return;
+                    settings_div.hidden = false;
+                    update_settings_div.hidden = false;
+                    create_settings_div.hidden = true;
+                    shadow_div.hidden = false;
+                };
+
+                document.getElementById("new-packs-button").onclick = () => {
+                    let selected = get_selected_packs(true);
+
+                    for(pack of selected) {
+                        move_pack(pack, true)
+                    }
+                };
+
+                document.getElementById("old-packs-button").onclick = () => {
+                    let selected = get_selected_packs(false);
+
+                    for(pack of selected) {
+                        move_pack(pack, false)
+                    }
+                }
+            })();
+        </script>
         <script type='module'>
             import init, { client_main } from './client/client.js';
 

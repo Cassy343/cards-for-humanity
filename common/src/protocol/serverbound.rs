@@ -1,6 +1,6 @@
 use crate::data::cards::CardID;
 
-use super::GameSetting;
+use super::{GameSetting, GameSettings};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -32,11 +32,18 @@ impl WrappedServerBoundPacket {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerBoundPacket {
+    // Game packets
     SetPlayerName(String),
     StartGame,
     UpdateSetting(GameSetting),
     SelectResponse(CardID),
     SelectRoundWinner(usize),
+
+    // Lobby packets
+    CreateServer(GameSettings),
+    JoinGame(usize),
+    RefreshServerList,
+    RequestCardPacks,
 }
 
 impl ServerBoundPacket {

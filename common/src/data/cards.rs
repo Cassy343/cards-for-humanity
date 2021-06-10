@@ -23,7 +23,7 @@ impl CardID {
     // proc macro server crashed
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Pack {
     pub name: String,
     pub official: bool,

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::GameSetting;
-use crate::data::cards::{CardID, Prompt, Response};
+use crate::data::cards::{CardID, Pack, Prompt, Response};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -40,6 +40,10 @@ pub enum ClientBoundPacket {
         packet_id: Uuid,
         response: PacketResponse,
     },
+    ServerList {
+        servers: Vec<(usize, usize, Option<usize>)>,
+    },
+    CardPacks(Vec<String>),
 }
 
 impl ClientBoundPacket {
@@ -48,7 +52,7 @@ impl ClientBoundPacket {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResponseData {
     pub id: CardID,
     pub text: Response,

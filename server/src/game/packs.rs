@@ -129,6 +129,10 @@ impl PackStore {
         }
     }
 
+    pub fn get_pack_names(&self) -> Vec<String> {
+        self.possible_packs.iter().map(|s| s.replace(".json", "")).collect()
+    }
+
     fn read_pack(path: &Path) -> Result<Pack, String> {
         let json = match fs::read_to_string(path) {
             Ok(f) => f,

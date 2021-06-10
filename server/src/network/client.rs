@@ -37,11 +37,13 @@ impl ClientHandler {
         &mut self,
         mut conn: UnboundedSender<Message>,
         address: Option<SocketAddr>,
+        listener: usize,
     ) -> Result<usize, SendError> {
         let id = self.client_id;
         conn.send(Message::text(encode(&[ClientBoundPacket::SetId(id)])))
             .await?;
-        self.client_list.insert(id, Client::new(id, conn, address));
+        self.client_list
+            .insert(id, Client::new(id, conn, address, listener));
         self.client_id += 1;
         Ok(id)
     }
@@ -121,7 +123,7 @@ impl ClientHandler {
         tokio::task::spawn(rx.map(|message| Ok(message)).forward(ws_tx));
 
         let mut handler_guard = client_handler.lock().await;
-        let id = match handler_guard.add_client(tx.clone(), address).await {
+        let id = match handler_guard.add_client(tx.clone(), address, 0).await {
             Ok(id) => id,
             Err(e) => {
                 error!("Failed to add client: {}", e);
@@ -163,6 +165,7 @@ pub struct Client {
     pub id: usize,
     connection: UnboundedSender<Message>,
     address: Option<SocketAddr>,
+    pub listener: usize
 }
 
 impl Client {
@@ -170,11 +173,13 @@ impl Client {
         id: usize,
         connection: UnboundedSender<Message>,
         address: Option<SocketAddr>,
+        listener: usize,
     ) -> Self {
         Client {
             id,
             connection,
             address,
+            listener
         }
     }
 

@@ -10,6 +10,7 @@ use common::{
         clientbound::{ClientBoundPacket, PacketResponse, ResponseData},
         serverbound::ServerBoundPacket,
         GameSetting,
+        GameSettings,
     },
 };
 use log::error;
@@ -18,6 +19,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tokio::sync::MutexGuard;
 
 pub struct Game {
+    pub id: usize,
     pack_store: Rc<RefCell<PackStore>>,
     players: VecMap<usize, Player>,
     host_id: usize,
@@ -25,7 +27,7 @@ pub struct Game {
     available_prompts: Vec<CardID>,
     available_responses: Vec<CardID>,
     state: GameState,
-    max_players: Option<usize>,
+    pub max_players: Option<usize>,
     max_selection_time: Option<u32>,
     points_to_win: u32,
     czar_index: usize,
@@ -33,23 +35,28 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(pack_store: Rc<RefCell<PackStore>>) -> Self {
-        let default_pack = pack_store.borrow().default_pack();
+    pub fn new(id: usize, pack_store: Rc<RefCell<PackStore>>, settings: GameSettings) -> Result<Self, String> {
+        let mut loaded_packs = Vec::new();
+        
+        for pack_name in settings.packs {
+            loaded_packs.push(pack_store.borrow_mut().load_pack(&pack_name)?)
+        }
 
-        Game {
+        Ok(Game {
+            id,
             pack_store,
             players: VecMap::new(),
             host_id: 0,
-            packs: vec![default_pack],
+            packs: loaded_packs,
             available_prompts: Vec::new(),
             available_responses: Vec::new(),
             state: GameState::WaitingToStart,
-            max_players: None,
-            max_selection_time: None,
-            points_to_win: 10,
+            max_players: settings.max_players,
+            max_selection_time: settings.max_selection_time,
+            points_to_win: settings.points_to_win,
             czar_index: 0,
             current_prompt: None,
-        }
+        })
     }
 
     fn initialize_prompts(&mut self) {
@@ -191,6 +198,10 @@ impl Game {
             )));
         }
         packets
+    }
+
+    pub fn num_players(&self) -> usize {
+        self.players.len()
     }
 }
 

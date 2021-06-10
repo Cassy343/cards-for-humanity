@@ -12,6 +12,14 @@ pub enum GameSetting {
     RemovePack(String),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GameSettings {
+    pub max_players: Option<usize>,
+    pub max_selection_time: Option<u32>,
+    pub points_to_win: u32,
+    pub packs: Vec<String>,
+}
+
 pub fn encode<P: Serialize>(packet: &P) -> String {
     serde_json::to_string(packet).unwrap()
 }

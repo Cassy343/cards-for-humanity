@@ -4,6 +4,7 @@
 mod console;
 mod game;
 mod html;
+mod js_events;
 mod ws;
 
 use common::protocol::{clientbound::ClientBoundPacket, decode};
@@ -21,11 +22,10 @@ pub fn client_main() {
     let socket = WebSocket::connect(&format!("ws://{}/ws", host)).unwrap();
     let (packet_pipe, packet_receiver) = mpsc::channel::<ClientBoundPacket>();
 
-    socket.onopen(move |socket| {
+    socket.onopen(move |_| {
         console_log!("Socket opened");
-        let _ =
-            socket.send_packet_with_id(common::protocol::serverbound::ServerBoundPacket::StartGame);
     });
+
     socket.onmessage(move |_socket, event| {
         let packet_string = match event.data().as_string() {
             Some(string) => string,

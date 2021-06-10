@@ -7,15 +7,16 @@ use common::protocol::{
 };
 use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
 use log::{debug, error, warn};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
-use tokio::sync::Mutex;
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use tokio::sync::{Mutex, RwLock};
 use warp::ws::Message;
 
 pub struct NetworkHandler {
     pub client_handler: Arc<Mutex<ClientHandler>>,
     incoming_messages: UnboundedReceiver<ClientEvent>,
-    listeners: Vec<Rc<RefCell<Box<dyn Listener>>>>,
+    listeners: HashMap<usize, Rc<RefCell<Box<dyn Listener>>>>,
     server_shutdown_hook: Option<Sender<()>>,
+    listener_id: usize,
 }
 
 impl NetworkHandler {
@@ -27,8 +28,9 @@ impl NetworkHandler {
         NetworkHandler {
             client_handler,
             incoming_messages,
-            listeners: Vec::new(),
+            listeners: HashMap::new(),
             server_shutdown_hook: Some(server_shutdown_hook),
+            listener_id: 0,
         }
     }
 
@@ -67,17 +69,43 @@ impl NetworkHandler {
                         }
                     };
 
-                    for i in 0 .. self.listeners.len() {
-                        for packet in packets.iter() {
-                            let response = self.listeners[i]
-                                .clone()
-                                .borrow_mut()
-                                .handle_packet(self, packet.packet(), client_id)
-                                .await;
-                            debug!("response {:?} to {:?}", response, packet);
-                            if let Some(id) = packet.packet_id() {
-                                acknowledgements.push((id, response));
-                            }
+                    let mut client_handler = self.client_handler.lock().await;
+
+                    let client = match client_handler.get_client_mut(client_id) {
+                        Some(client) => client,
+                        None => {
+                            warn!(
+                                "Received message from unknown client {}: {:?}",
+                                client_id, message
+                            );
+                            continue;
+                        }
+                    };
+
+                    let listener_id = client.listener;
+
+                    drop(client);
+                    drop(client_handler);
+
+                    let listener = match self.listeners.get(&listener_id) {
+                        Some(l) => l.clone(),
+                        None => {
+                            warn!(
+                                "Client ({}) has unregistered listener id {}",
+                                client_id, listener_id
+                            );
+                            continue;
+                        }
+                    };
+
+                    for packet in packets.iter() {
+                        let response = listener
+                            .borrow_mut()
+                            .handle_packet(self, packet.packet(), client_id)
+                            .await;
+                        debug!("response {:?} to {:?}", response, packet);
+                        if let Some(id) = packet.packet_id() {
+                            acknowledgements.push((id, response));
                         }
                     }
 
@@ -97,23 +125,73 @@ impl NetworkHandler {
                         .await;
                 }
                 Some(ClientEvent { data, client_id }) => match data {
-                    ClientEventData::Connect =>
-                        for i in 0 .. self.listeners.len() {
-                            self.listeners[i]
-                                .clone()
-                                .borrow_mut()
-                                .client_connected(self, client_id)
-                                .await;
-                        },
+                    ClientEventData::Connect => {
+                        let client_handler = self.client_handler.lock().await;
 
-                    ClientEventData::Disconnect =>
-                        for i in 0 .. self.listeners.len() {
-                            self.listeners[i]
-                                .clone()
-                                .borrow_mut()
-                                .client_disconnected(self, client_id)
-                                .await;
-                        },
+                        let client = match client_handler.get_client(client_id) {
+                            Some(client) => client,
+                            None => {
+                                warn!("Received connection from unknown client {}", client_id);
+                                continue;
+                            }
+                        };
+
+                        let listener_id = client.listener;
+
+                        let listener = match self.listeners.get(&listener_id) {
+                            Some(l) => l,
+                            None => {
+                                warn!(
+                                    "Client ({}) has unregistered listener id {}",
+                                    client_id, listener_id
+                                );
+                                continue;
+                            }
+                        };
+
+                        drop(client);
+                        drop(client_handler);
+
+                        listener
+                            .clone()
+                            .borrow_mut()
+                            .client_connected(self, client_id)
+                            .await;
+                    }
+
+                    ClientEventData::Disconnect => {
+                        let client_handler = self.client_handler.lock().await;
+
+                        let client = match client_handler.get_client(client_id) {
+                            Some(client) => client,
+                            None => {
+                                warn!("Received connection from unknown client {}", client_id);
+                                continue;
+                            }
+                        };
+
+                        let listener_id = client.listener;
+
+                        let listener = match self.listeners.get(&listener_id) {
+                            Some(l) => l,
+                            None => {
+                                warn!(
+                                    "Client ({}) has unregistered listener id {}",
+                                    client_id, listener_id
+                                );
+                                continue;
+                            }
+                        };
+
+                        drop(client);
+                        drop(client_handler);
+
+                        listener
+                            .clone()
+                            .borrow_mut()
+                            .client_disconnected(self, client_id)
+                            .await;
+                    }
 
                     _ => unreachable!(),
                 },
@@ -125,12 +203,25 @@ impl NetworkHandler {
         }
 
         self.listeners
-            .retain(|listener| !listener.borrow().is_terminated());
+            .retain(|_, listener| !listener.borrow().is_terminated());
     }
 
-    pub fn add_listener<L: Listener + 'static>(&mut self, listener: L) {
+    pub fn add_listener<L: Listener + 'static>(&mut self, listener: L) -> usize {
+        let new_id = self.listener_id;
+        debug!("new_id {}", new_id);
         self.listeners
-            .push(Rc::new(RefCell::new(Box::new(listener))));
+            .insert(new_id, Rc::new(RefCell::new(Box::new(listener))));
+        self.listener_id += 1;
+        debug!("new_id {}", new_id);
+        new_id
+    }
+
+    pub fn next_id(&self) -> usize {
+        self.listener_id
+    }
+
+    pub fn valid_listener(&self, id: usize) -> bool {
+        self.listeners.contains_key(&id)
     }
 
     pub async fn shutdown(&mut self) {
@@ -151,6 +242,12 @@ impl NetworkHandler {
             .await;
         self.listeners.clear();
     }
+
+    pub async fn forward_client(&mut self, client_id: usize, listener_id: usize) -> Option<()> {
+        self.client_handler.lock().await.get_client_mut(client_id)?.listener = listener_id;
+        self.listeners.get(&listener_id)?.clone().borrow_mut().client_connected(self, client_id).await;
+        Some(())
+    }
 }
 
 #[async_trait(?Send)]
@@ -168,5 +265,38 @@ pub trait Listener {
 
     fn is_terminated(&self) -> bool {
         false
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: Listener> Listener for Rc<RwLock<T>> {
+    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: usize) {
+        self.write()
+            .await
+            .client_connected(network_handler, client_id)
+            .await
+    }
+
+    async fn client_disconnected(
+        &mut self,
+        network_handler: &mut NetworkHandler,
+        client_id: usize,
+    ) {
+        self.write()
+            .await
+            .client_disconnected(network_handler, client_id)
+            .await
+    }
+
+    async fn handle_packet(
+        &mut self,
+        network_handler: &mut NetworkHandler,
+        packet: &ServerBoundPacket,
+        sender_id: usize,
+    ) -> PacketResponse {
+        self.write()
+            .await
+            .handle_packet(network_handler, packet, sender_id)
+            .await
     }
 }

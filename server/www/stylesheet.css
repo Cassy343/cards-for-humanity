@@ -28,12 +28,6 @@
     background: white;
 }
 
-.black-card-div {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-}
-
 .black-card {
     background-color: black;
     color: white;
@@ -42,16 +36,12 @@
 
 .hand {
     border-top-style: none;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    min-height: 140px;
 }
 
 .played {
     border-bottom-style: none;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    min-height: 140px;
 }
 
 .holder {
@@ -59,18 +49,7 @@
     border-color: black;
     border-style: solid;
     border-width: 2px;
-}
-
-.played-cards {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-}
-
-.player-responses {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    min-width: inherit;
 }
 
 .footer {
@@ -83,9 +62,8 @@
 }
 
 .players-list {
-    display: flex;
-    flex-direction: row;
     border-bottom-style: none;
+    min-height: 50px;
 }
 
 .player {
@@ -99,4 +77,96 @@
 
 .czar {
     background-color: lightslategray;
+}
+
+.winner {
+    background-color: royalblue;
+}
+
+.box {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.tall-box {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+}
+
+.button {
+    border-width: 2px;
+    border-radius: 20px;
+    border-color: black;
+    border-style: solid;
+    background-color: dimgray;
+    padding: 3px;
+    max-width: max-content;
+    max-height: max-content;
+}
+
+.button:hover {
+    background-color: rgb(116, 132, 151);
+    
+}
+
+.button:active {
+    background-color: rgb(51, 54, 71);
+}
+
+.game {
+    position: absolute;
+    z-index: -1;
+    min-height: 80%;
+    min-width: 95%;
+}
+
+.lobby {
+    position: absolute;
+    z-index: -1;
+    min-height: 80%;
+    min-width: 95%;
+}
+
+.settings-menu {
+    position: absolute;
+    z-index: 1;
+}
+
+#background {
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(39, 39, 39, 0.8);
+    z-index:0;
+}
+
+.server-entry {
+    border-radius: 25px;
+    border-style: solid;
+    padding: 30px;
+    padding-top: 10px;
+    margin-left: 10px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    width: 120px;
+    min-height: 140px;
+    font-size: 90%;
+    border-color: black;
+    background: white;
+}
+
+.server-entry:hover {
+    background: rgb(189, 189, 189);
+}
+
+.server-entry:active {
+    background-color: rgb(126, 126, 126);
+}
+
+.player-responses {
+    border-radius: 25px;
 }

@@ -38,5 +38,6 @@ features = [
     'RequestMode',
     'EventTarget',
     'DomTokenList',
-    'Location'
+    'Location',
+    'HtmlInputElement'
 ]
