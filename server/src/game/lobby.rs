@@ -31,6 +31,14 @@ impl Lobby {
 #[async_trait(?Send)]
 impl Listener for Lobby {
     async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
+        // Drop any Games that have terminated
+        self.games.retain(|g| {
+            // Same note as in handler.rs
+            // now_or_never could return None if the RwLock is being used but it doesn't matter
+            !futures::FutureExt::now_or_never(async { g.read().await.is_terminated() })
+                .unwrap_or(false)
+        });
+
         let games_future = self.games.iter().map(|g| g.read()).collect::<Vec<_>>();
         let games = join_all(games_future).await;
 

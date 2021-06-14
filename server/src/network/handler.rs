@@ -9,8 +9,8 @@ use futures::channel::{mpsc::UnboundedReceiver, oneshot::Sender};
 use log::{debug, error, warn};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
-use warp::ws::Message;
 use uuid::Uuid;
+use warp::ws::Message;
 
 pub struct NetworkHandler {
     pub client_handler: Arc<Mutex<ClientHandler>>,
@@ -158,19 +158,7 @@ impl NetworkHandler {
                             .await;
                     }
 
-                    ClientEventData::Disconnect => {
-                        let client_handler = self.client_handler.lock().await;
-
-                        let client = match client_handler.get_client(client_id) {
-                            Some(client) => client,
-                            None => {
-                                warn!("Received connection from unknown client {}", client_id);
-                                continue;
-                            }
-                        };
-
-                        let listener_id = client.listener;
-
+                    ClientEventData::Disconnect(listener_id) => {
                         let listener = match self.listeners.get(&listener_id) {
                             Some(l) => l,
                             None => {
@@ -181,9 +169,6 @@ impl NetworkHandler {
                                 continue;
                             }
                         };
-
-                        drop(client);
-                        drop(client_handler);
 
                         listener
                             .clone()
@@ -278,11 +263,7 @@ impl<T: Listener> Listener for Rc<RwLock<T>> {
             .await
     }
 
-    async fn client_disconnected(
-        &mut self,
-        network_handler: &mut NetworkHandler,
-        client_id: Uuid,
-    ) {
+    async fn client_disconnected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
         self.write()
             .await
             .client_disconnected(network_handler, client_id)
@@ -305,8 +286,7 @@ impl<T: Listener> Listener for Rc<RwLock<T>> {
         // If the RwLock is blocked this will not execute properly
         // But terminated will mean no clients blocking the RwLock
         // So if we default to false then we don't have to worry about things being blocked
-        futures::FutureExt::now_or_never(async {
-            self.read().await.is_terminated()
-        }).unwrap_or(false)
+        futures::FutureExt::now_or_never(async { self.read().await.is_terminated() })
+            .unwrap_or(false)
     }
 }

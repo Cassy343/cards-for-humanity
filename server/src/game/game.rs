@@ -15,9 +15,14 @@ use common::{
 };
 use log::error;
 use rand::{thread_rng, Rng};
-use uuid::Uuid;
-use std::{borrow::Borrow, cell::{RefCell, RefMut}, collections::HashMap, rc::Rc};
+use std::{
+    borrow::Borrow,
+    cell::{RefCell, RefMut},
+    collections::HashMap,
+    rc::Rc,
+};
 use tokio::sync::MutexGuard;
+use uuid::Uuid;
 
 pub struct Game {
     pub id: Uuid,
@@ -165,9 +170,7 @@ impl Game {
                 new_responses: responses,
             };
 
-            client_handler
-                .send_packet(*id, &round_data)
-                .await;
+            client_handler.send_packet(*id, &round_data).await;
         }
 
         self.current_prompt = Some(prompt);
@@ -271,11 +274,7 @@ impl Listener for Game {
         client_handler.send_packets(client_id, &packets).await;
     }
 
-    async fn client_disconnected(
-        &mut self,
-        network_handler: &mut NetworkHandler,
-        client_id: Uuid,
-    ) {
+    async fn client_disconnected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
         // If the final player is leaving
         if self.players.len() == 1 {
             self.players.remove(&client_id);
@@ -537,22 +536,25 @@ impl Listener for Game {
 
     fn is_terminated(&self) -> bool {
         match self.state {
-            GameState::End => {
-                self.players.len() == 0
-            },
-            _ => {
-                false
-            }
+            GameState::End => self.players.len() == 0,
+            _ => false,
         }
     }
 }
 
 impl Drop for Game {
     fn drop(&mut self) {
-        let packs = self.packs.clone();
+        let packs = self
+            .packs
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
+        // Drop the loaded Packs
+        self.packs = Vec::new();
+
         let mut store: RefMut<PackStore> = self.pack_store.borrow_mut();
         for pack in packs {
-            store.unload_pack(&pack.as_ref().name)
+            store.unload_pack(&pack)
         }
     }
 }

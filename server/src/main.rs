@@ -8,7 +8,6 @@ use linefeed::{Interface, ReadResult};
 use log::error;
 use network::{client::ClientHandler, NetworkHandler};
 use once_cell::sync::OnceCell;
-use uuid::Uuid;
 use std::{
     cell::RefCell,
     error::Error,
@@ -21,6 +20,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::Mutex;
+use uuid::Uuid;
 use warp::{ws::Ws, Filter};
 use zip::ZipArchive;
 

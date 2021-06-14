@@ -6,9 +6,9 @@ use futures::{
 };
 use log::{debug, error};
 use serde::Serialize;
-use uuid::Uuid;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
+use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
 
 use crate::LOBBY_ID;
@@ -124,7 +124,10 @@ impl ClientHandler {
 
         let mut handler_guard = client_handler.lock().await;
         // Unwrap is always safe because socket is not opened before we set LOBBY_ID
-        let id = match handler_guard.add_client(tx.clone(), address, LOBBY_ID.get().unwrap().clone()).await {
+        let id = match handler_guard
+            .add_client(tx.clone(), address, LOBBY_ID.get().unwrap().clone())
+            .await
+        {
             Ok(id) => id,
             Err(e) => {
                 error!("Failed to add client: {}", e);
@@ -156,8 +159,12 @@ impl ClientHandler {
             }
         }
 
-        let _ = pipe.send(ClientEvent::disconnect(id)).await;
-        client_handler.lock().await.remove_client(id);
+
+        // Unwrap is safe because we know the client is in the map
+        let client = client_handler.lock().await.remove_client(id).unwrap();
+        let _ = pipe
+            .send(ClientEvent::disconnect(id, client.listener))
+            .await;
         debug!("Client disconnected (ID {})", id);
     }
 }
@@ -209,9 +216,9 @@ impl ClientEvent {
         }
     }
 
-    pub fn disconnect(client_id: Uuid) -> Self {
+    pub fn disconnect(client_id: Uuid, listener_id: Uuid) -> Self {
         ClientEvent {
-            data: ClientEventData::Disconnect,
+            data: ClientEventData::Disconnect(listener_id),
             client_id,
         }
     }
@@ -220,5 +227,5 @@ impl ClientEvent {
 pub enum ClientEventData {
     Connect,
     Message(Message),
-    Disconnect,
+    Disconnect(Uuid),
 }
