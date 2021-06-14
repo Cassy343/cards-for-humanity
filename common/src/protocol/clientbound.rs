@@ -7,33 +7,33 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientBoundPacket {
-    SetId(usize),
+    SetId(Uuid),
     StartGame,
     SettingUpdate(GameSetting),
     AddPlayer {
-        id: usize,
+        id: Uuid,
         name: String,
         is_host: bool,
         points: u32,
     },
     UpdatePlayerName {
-        id: usize,
+        id: Uuid,
         name: String,
     },
     RemovePlayer {
-        id: usize,
-        new_host: Option<usize>,
+        id: Uuid,
+        new_host: Option<Uuid>,
     },
-    PlayerFinishedPicking(usize),
-    DisplayResponses(HashMap<usize, Vec<ResponseData>>),
+    PlayerFinishedPicking(Uuid),
+    DisplayResponses(HashMap<Uuid, Vec<ResponseData>>),
     NextRound {
-        czar: usize,
+        czar: Uuid,
         prompt: Prompt,
         new_responses: Vec<ResponseData>,
     },
     CancelRound,
     DisplayWinner {
-        winner: usize,
+        winner: Uuid,
         end_game: bool,
     },
     Ack {
@@ -41,7 +41,7 @@ pub enum ClientBoundPacket {
         response: PacketResponse,
     },
     ServerList {
-        servers: Vec<(usize, usize, Option<usize>)>,
+        servers: Vec<(Uuid, usize, Option<usize>)>,
     },
     CardPacks(Vec<String>),
 }

@@ -10,6 +10,7 @@ use common::protocol::{
 use futures::future::join_all;
 use log::warn;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use super::{packs::PackStore, Game};
 
@@ -29,7 +30,7 @@ impl Lobby {
 
 #[async_trait(?Send)]
 impl Listener for Lobby {
-    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: usize) {
+    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
         let games_future = self.games.iter().map(|g| g.read()).collect::<Vec<_>>();
         let games = join_all(games_future).await;
 
@@ -63,7 +64,7 @@ impl Listener for Lobby {
     async fn client_disconnected(
         &mut self,
         _network_handler: &mut NetworkHandler,
-        _client_id: usize,
+        _client_id: Uuid,
     ) {
     }
 
@@ -71,7 +72,7 @@ impl Listener for Lobby {
         &mut self,
         network_handler: &mut NetworkHandler,
         packet: &ServerBoundPacket,
-        sender_id: usize,
+        sender_id: Uuid,
     ) -> PacketResponse {
         match packet {
             ServerBoundPacket::CreateServer(settings) => {
@@ -96,7 +97,9 @@ impl Listener for Lobby {
                 }
 
                 let new_game = match Game::new(
-                    network_handler.next_id(),
+                    // Use a fake Uuid to create the game because we can't know what uuid is assigned to it
+                    Uuid::from_u128(0),
+                    sender_id.clone(),
                     self.pack_store.clone(),
                     settings.clone(),
                 ) {
@@ -110,6 +113,7 @@ impl Listener for Lobby {
                 };
 
                 let listener_id = network_handler.add_listener(new_game.clone());
+                new_game.write().await.id = listener_id;
                 self.games.push(new_game);
 
                 match network_handler.forward_client(sender_id, listener_id).await {

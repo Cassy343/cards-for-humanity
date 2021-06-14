@@ -1,5 +1,6 @@
 use common::protocol::{clientbound::ResponseData, GameSettings};
 use js_sys::Array;
+use uuid::Uuid;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{HtmlElement, HtmlInputElement};
 
@@ -34,20 +35,20 @@ pub fn prompt_card_html(card: &PromptCard) -> String {
 // $ID the internal id of the user
 // $NAME the name of the user
 // $POINTS the points of the user
-pub fn player_html(player: &Player, usize: &usize) -> String {
+pub fn player_html(player: &Player, id: &Uuid) -> String {
     PLAYER_TEMPLATE
-        .replace("$ID", &format!("{}", usize))
+        .replace("$ID", &format!("{}", id))
         .replace("$NAME", &player.name)
         .replace("$POINTS", &player.points.to_string())
 }
 
 // Template variables
 // $ID the internal id of the user
-pub fn player_response_html(usize: &usize) -> String {
-    PLAYER_RESPONSE_TEMPLATE.replace("$ID", &usize.to_string())
+pub fn player_response_html(id: &Uuid) -> String {
+    PLAYER_RESPONSE_TEMPLATE.replace("$ID", &id.to_string())
 }
 
-pub fn server_html(id: usize, player_count: usize, max_players: usize) -> String {
+pub fn server_html(id: &Uuid, player_count: usize, max_players: usize) -> String {
     SERVER_TEMPLATE
         .replace("$SERVER_ID", &id.to_string())
         .replace("$PLAYER_NUM", &player_count.to_string())
@@ -100,7 +101,7 @@ pub fn init_lobby() {
     game.set_hidden(true);
 }
 
-pub fn add_server(server_id: usize, num_players: usize, max_players: Option<usize>) -> HtmlElement {
+pub fn add_server(server_id: &Uuid, num_players: usize, max_players: Option<usize>) -> HtmlElement {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     let server_list = document.get_element_by_id("server-list").unwrap();
@@ -147,7 +148,7 @@ pub fn get_name_input_value() -> String {
     input.value()
 }
 
-pub fn set_player_responses(id: &usize, cards: &Vec<ResponseData>) -> HtmlElement {
+pub fn set_player_responses(id: &Uuid, cards: &Vec<ResponseData>) -> HtmlElement {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     let responses = document.get_element_by_id("played-cards").unwrap();
@@ -209,7 +210,7 @@ pub fn set_prompt_card(card: &PromptCard) {
     prompt_div.set_inner_html(&prompt_card_html(card))
 }
 
-pub fn add_player(player: &Player, id: &usize) {
+pub fn add_player(player: &Player, id: &Uuid) {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     let player_list = document.get_element_by_id("players-list").unwrap();
@@ -280,17 +281,20 @@ pub fn get_settings() -> GameSettings {
 
 #[wasm_bindgen]
 extern "C" {
+    // All ids are sent in as &str
+    // This is because sending Rust types to JS is a pain
+    // And since they get simplified to JS strings anyway when used this doesn't matter
     fn get_selected_packs(new_packs: bool) -> JsValue;
     fn add_pack(new_pack: String);
     pub fn set_user_points(points: u32);
     pub fn set_user_name(name: &str);
-    pub fn clear_player_marks(id: usize);
-    pub fn mark_player_czar(id: usize);
-    pub fn mark_player_played(id: usize);
-    pub fn update_player_name(id: usize, name: &str);
-    pub fn update_player_points(id: usize, points: u32);
+    pub fn clear_player_marks(id: &str);
+    pub fn mark_player_czar(id: &str);
+    pub fn mark_player_played(id: &str);
+    pub fn update_player_name(id: &str, name: &str);
+    pub fn update_player_points(id: &str, points: u32);
     pub fn remove_card_from_hand(index: u8);
-    pub fn remove_player(id: usize);
+    pub fn remove_player(id: &str);
     pub fn clear_response_cards();
     pub fn place_blank_response();
     pub fn clear_servers();

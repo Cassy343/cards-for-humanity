@@ -6,13 +6,15 @@ use futures::{
 };
 use log::{debug, error};
 use serde::Serialize;
+use uuid::Uuid;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use warp::ws::{Message, WebSocket};
 
+use crate::LOBBY_ID;
+
 pub struct ClientHandler {
-    client_list: HashMap<usize, Client>,
-    client_id: usize,
+    client_list: HashMap<Uuid, Client>,
     message_pipe: UnboundedSender<ClientEvent>,
 }
 
@@ -22,7 +24,6 @@ impl ClientHandler {
         (
             ClientHandler {
                 client_list: HashMap::new(),
-                client_id: 0,
                 message_pipe,
             },
             message_aggregator,
@@ -37,32 +38,31 @@ impl ClientHandler {
         &mut self,
         mut conn: UnboundedSender<Message>,
         address: Option<SocketAddr>,
-        listener: usize,
-    ) -> Result<usize, SendError> {
-        let id = self.client_id;
+        listener: Uuid,
+    ) -> Result<Uuid, SendError> {
+        let id = Uuid::new_v4();
         conn.send(Message::text(encode(&[ClientBoundPacket::SetId(id)])))
             .await?;
         self.client_list
             .insert(id, Client::new(id, conn, address, listener));
-        self.client_id += 1;
         Ok(id)
     }
 
-    pub fn get_client(&self, client_id: usize) -> Option<&Client> {
+    pub fn get_client(&self, client_id: Uuid) -> Option<&Client> {
         self.client_list.get(&client_id)
     }
 
-    pub fn get_client_mut(&mut self, client_id: usize) -> Option<&mut Client> {
+    pub fn get_client_mut(&mut self, client_id: Uuid) -> Option<&mut Client> {
         self.client_list.get_mut(&client_id)
     }
 
-    pub fn remove_client(&mut self, id: usize) -> Option<Client> {
-        self.client_list.remove(&id)
+    pub fn remove_client(&mut self, client_id: Uuid) -> Option<Client> {
+        self.client_list.remove(&client_id)
     }
 
     pub async fn send_packet<P: Serialize>(
         &mut self,
-        client_id: usize,
+        client_id: Uuid,
         packet: &P,
     ) -> Option<Result<(), SendError>> {
         self.send_packets(client_id, &[packet]).await
@@ -70,7 +70,7 @@ impl ClientHandler {
 
     pub async fn send_packets<'a, T, P>(
         &mut self,
-        client_id: usize,
+        client_id: Uuid,
         packets: T,
     ) -> Option<Result<(), SendError>>
     where
@@ -123,7 +123,8 @@ impl ClientHandler {
         tokio::task::spawn(rx.map(|message| Ok(message)).forward(ws_tx));
 
         let mut handler_guard = client_handler.lock().await;
-        let id = match handler_guard.add_client(tx.clone(), address, 0).await {
+        // Unwrap is always safe because socket is not opened before we set LOBBY_ID
+        let id = match handler_guard.add_client(tx.clone(), address, LOBBY_ID.get().unwrap().clone()).await {
             Ok(id) => id,
             Err(e) => {
                 error!("Failed to add client: {}", e);
@@ -162,18 +163,18 @@ impl ClientHandler {
 }
 
 pub struct Client {
-    pub id: usize,
+    pub id: Uuid,
     connection: UnboundedSender<Message>,
     address: Option<SocketAddr>,
-    pub listener: usize,
+    pub listener: Uuid,
 }
 
 impl Client {
     pub fn new(
-        id: usize,
+        id: Uuid,
         connection: UnboundedSender<Message>,
         address: Option<SocketAddr>,
-        listener: usize,
+        listener: Uuid,
     ) -> Self {
         Client {
             id,
@@ -190,25 +191,25 @@ impl Client {
 
 pub struct ClientEvent {
     pub data: ClientEventData,
-    pub client_id: usize,
+    pub client_id: Uuid,
 }
 
 impl ClientEvent {
-    pub fn connect(client_id: usize) -> Self {
+    pub fn connect(client_id: Uuid) -> Self {
         ClientEvent {
             data: ClientEventData::Connect,
             client_id,
         }
     }
 
-    pub fn message(message: Message, client_id: usize) -> Self {
+    pub fn message(message: Message, client_id: Uuid) -> Self {
         ClientEvent {
             data: ClientEventData::Message(message),
             client_id,
         }
     }
 
-    pub fn disconnect(client_id: usize) -> Self {
+    pub fn disconnect(client_id: Uuid) -> Self {
         ClientEvent {
             data: ClientEventData::Disconnect,
             client_id,

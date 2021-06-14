@@ -7,6 +7,8 @@ use game::packs::PackStore;
 use linefeed::{Interface, ReadResult};
 use log::error;
 use network::{client::ClientHandler, NetworkHandler};
+use once_cell::sync::OnceCell;
+use uuid::Uuid;
 use std::{
     cell::RefCell,
     error::Error,
@@ -23,6 +25,7 @@ use warp::{ws::Ws, Filter};
 use zip::ZipArchive;
 
 const CLIENT_FILES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client.zip"));
+static LOBBY_ID: OnceCell<Uuid> = OnceCell::new();
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -52,7 +55,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let server_shutdown_hook = start_server(client_handler.clone()).await;
     let mut network_handler =
         NetworkHandler::new(client_handler, incoming_messages, server_shutdown_hook);
-    network_handler.add_listener(game::Lobby::new(pack_store));
+    let lobby_id = network_handler.add_listener(game::Lobby::new(pack_store));
+    LOBBY_ID.set(lobby_id).expect("Error setting LOBBY_ID");
 
     loop {
         // Check for a new command every 50ms

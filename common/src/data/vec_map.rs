@@ -4,6 +4,7 @@ use std::{
     slice::SliceIndex,
 };
 
+#[derive(Clone)]
 pub struct VecMap<K, V> {
     inner: Vec<(K, V)>,
 }

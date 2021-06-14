@@ -37,11 +37,11 @@ pub enum ServerBoundPacket {
     StartGame,
     UpdateSetting(GameSetting),
     SelectResponse(CardID),
-    SelectRoundWinner(usize),
+    SelectRoundWinner(Uuid),
 
     // Lobby packets
     CreateServer(GameSettings),
-    JoinGame(usize),
+    JoinGame(Uuid),
     RefreshServerList,
     RequestCardPacks,
 }

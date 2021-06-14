@@ -15,14 +15,15 @@ use common::{
 };
 use log::error;
 use rand::{thread_rng, Rng};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use uuid::Uuid;
+use std::{borrow::Borrow, cell::{RefCell, RefMut}, collections::HashMap, rc::Rc};
 use tokio::sync::MutexGuard;
 
 pub struct Game {
-    pub id: usize,
+    pub id: Uuid,
     pack_store: Rc<RefCell<PackStore>>,
-    players: VecMap<usize, Player>,
-    host_id: usize,
+    players: VecMap<Uuid, Player>,
+    host_id: Uuid,
     packs: Vec<Rc<Pack>>,
     available_prompts: Vec<CardID>,
     available_responses: Vec<CardID>,
@@ -36,7 +37,8 @@ pub struct Game {
 
 impl Game {
     pub fn new(
-        id: usize,
+        id: Uuid,
+        host_id: Uuid,
         pack_store: Rc<RefCell<PackStore>>,
         settings: GameSettings,
     ) -> Result<Self, String> {
@@ -50,7 +52,7 @@ impl Game {
             id,
             pack_store,
             players: VecMap::new(),
-            host_id: 0,
+            host_id,
             packs: loaded_packs,
             available_prompts: Vec::new(),
             available_responses: Vec::new(),
@@ -151,20 +153,20 @@ impl Game {
         let prompt = self.select_prompt();
 
         let mut client_handler = network_handler.client_handler.lock().await;
-        for index in 0 .. self.players.len() {
+        for (id, _player) in self.players.clone().iter() {
             let mut responses = Vec::with_capacity(add_cards);
-            if index != last_czar {
+            if id != &self.players[last_czar].0 {
                 self.add_responses(&mut responses, add_cards);
             }
 
             let round_data = ClientBoundPacket::NextRound {
-                czar: self.czar_index,
+                czar: self.players[self.czar_index].0,
                 prompt: prompt.clone(),
                 new_responses: responses,
             };
 
             client_handler
-                .send_packet(self.players[index].0, &round_data)
+                .send_packet(*id, &round_data)
                 .await;
         }
 
@@ -211,7 +213,7 @@ impl Game {
 
 #[async_trait(?Send)]
 impl Listener for Game {
-    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: usize) {
+    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
         let set_host = self.players.is_empty();
         if set_host {
             self.host_id = client_id;
@@ -237,7 +239,7 @@ impl Listener for Game {
             self.add_responses(&mut responses, 10);
             if let Some(prompt) = self.current_prompt.as_ref() {
                 packets.push(ClientBoundPacket::NextRound {
-                    czar: self.czar_index,
+                    czar: self.players[self.czar_index].0,
                     prompt: prompt.clone(),
                     new_responses: responses,
                 });
@@ -272,8 +274,15 @@ impl Listener for Game {
     async fn client_disconnected(
         &mut self,
         network_handler: &mut NetworkHandler,
-        client_id: usize,
+        client_id: Uuid,
     ) {
+        // If the final player is leaving
+        if self.players.len() == 1 {
+            self.players.remove(&client_id);
+            self.state = GameState::End;
+            return;
+        }
+
         // Cancel the round if the czar left
         let skip_round = client_id == self.players[self.czar_index].0;
 
@@ -321,7 +330,7 @@ impl Listener for Game {
         &mut self,
         network_handler: &mut NetworkHandler,
         packet: &ServerBoundPacket,
-        sender_id: usize,
+        sender_id: Uuid,
     ) -> PacketResponse {
         match self.state {
             GameState::WaitingToStart => {
@@ -355,7 +364,7 @@ impl Listener for Game {
                             self.add_responses(&mut responses, 10);
 
                             let round_data = ClientBoundPacket::NextRound {
-                                czar: self.czar_index,
+                                czar: self.players[self.czar_index].0,
                                 prompt: prompt.clone(),
                                 new_responses: responses,
                             };
@@ -494,7 +503,7 @@ impl Listener for Game {
                     return PacketResponse::Rejected;
                 }
 
-                let winner = match self.players.get_mut(&(winner_id as usize)) {
+                let winner = match self.players.get_mut(&winner_id) {
                     Some(winner) => winner,
                     None =>
                         return PacketResponse::RejectedWithReason(format!(
@@ -508,7 +517,7 @@ impl Listener for Game {
                 self.broadcast_to_players(
                     &mut network_handler.client_handler.lock().await,
                     &ClientBoundPacket::DisplayWinner {
-                        winner: winner_id as usize,
+                        winner: winner_id,
                         end_game,
                     },
                 )
@@ -525,10 +534,32 @@ impl Listener for Game {
 
         PacketResponse::Accepted
     }
+
+    fn is_terminated(&self) -> bool {
+        match self.state {
+            GameState::End => {
+                self.players.len() == 0
+            },
+            _ => {
+                false
+            }
+        }
+    }
 }
 
+impl Drop for Game {
+    fn drop(&mut self) {
+        let packs = self.packs.clone();
+        let mut store: RefMut<PackStore> = self.pack_store.borrow_mut();
+        for pack in packs {
+            store.unload_pack(&pack.as_ref().name)
+        }
+    }
+}
+
+#[derive(Clone)]
 struct Player {
-    client_id: usize,
+    client_id: Uuid,
     name: String,
     is_host: bool,
     points: u32,
@@ -536,7 +567,7 @@ struct Player {
 }
 
 impl Player {
-    pub fn new(client_id: usize, is_host: bool) -> Self {
+    pub fn new(client_id: Uuid, is_host: bool) -> Self {
         Player {
             client_id,
             name: format!("Player #{}", client_id),

@@ -10,13 +10,13 @@ use log::{debug, error, warn};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 use warp::ws::Message;
+use uuid::Uuid;
 
 pub struct NetworkHandler {
     pub client_handler: Arc<Mutex<ClientHandler>>,
     incoming_messages: UnboundedReceiver<ClientEvent>,
-    listeners: HashMap<usize, Rc<RefCell<Box<dyn Listener>>>>,
+    listeners: HashMap<Uuid, Rc<RefCell<Box<dyn Listener>>>>,
     server_shutdown_hook: Option<Sender<()>>,
-    listener_id: usize,
 }
 
 impl NetworkHandler {
@@ -30,7 +30,6 @@ impl NetworkHandler {
             incoming_messages,
             listeners: HashMap::new(),
             server_shutdown_hook: Some(server_shutdown_hook),
-            listener_id: 0,
         }
     }
 
@@ -206,21 +205,14 @@ impl NetworkHandler {
             .retain(|_, listener| !listener.borrow().is_terminated());
     }
 
-    pub fn add_listener<L: Listener + 'static>(&mut self, listener: L) -> usize {
-        let new_id = self.listener_id;
-        debug!("new_id {}", new_id);
+    pub fn add_listener<L: Listener + 'static>(&mut self, listener: L) -> Uuid {
+        let id = Uuid::new_v4();
         self.listeners
-            .insert(new_id, Rc::new(RefCell::new(Box::new(listener))));
-        self.listener_id += 1;
-        debug!("new_id {}", new_id);
-        new_id
+            .insert(id, Rc::new(RefCell::new(Box::new(listener))));
+        id
     }
 
-    pub fn next_id(&self) -> usize {
-        self.listener_id
-    }
-
-    pub fn valid_listener(&self, id: usize) -> bool {
+    pub fn valid_listener(&self, id: Uuid) -> bool {
         self.listeners.contains_key(&id)
     }
 
@@ -243,7 +235,7 @@ impl NetworkHandler {
         self.listeners.clear();
     }
 
-    pub async fn forward_client(&mut self, client_id: usize, listener_id: usize) -> Option<()> {
+    pub async fn forward_client(&mut self, client_id: Uuid, listener_id: Uuid) -> Option<()> {
         self.client_handler
             .lock()
             .await
@@ -261,15 +253,15 @@ impl NetworkHandler {
 
 #[async_trait(?Send)]
 pub trait Listener {
-    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: usize);
+    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid);
 
-    async fn client_disconnected(&mut self, network_handler: &mut NetworkHandler, client_id: usize);
+    async fn client_disconnected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid);
 
     async fn handle_packet(
         &mut self,
         network_handler: &mut NetworkHandler,
         packet: &ServerBoundPacket,
-        sender_id: usize,
+        sender_id: Uuid,
     ) -> PacketResponse;
 
     fn is_terminated(&self) -> bool {
@@ -279,7 +271,7 @@ pub trait Listener {
 
 #[async_trait(?Send)]
 impl<T: Listener> Listener for Rc<RwLock<T>> {
-    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: usize) {
+    async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
         self.write()
             .await
             .client_connected(network_handler, client_id)
@@ -289,7 +281,7 @@ impl<T: Listener> Listener for Rc<RwLock<T>> {
     async fn client_disconnected(
         &mut self,
         network_handler: &mut NetworkHandler,
-        client_id: usize,
+        client_id: Uuid,
     ) {
         self.write()
             .await
@@ -301,11 +293,20 @@ impl<T: Listener> Listener for Rc<RwLock<T>> {
         &mut self,
         network_handler: &mut NetworkHandler,
         packet: &ServerBoundPacket,
-        sender_id: usize,
+        sender_id: Uuid,
     ) -> PacketResponse {
         self.write()
             .await
             .handle_packet(network_handler, packet, sender_id)
             .await
+    }
+
+    fn is_terminated(&self) -> bool {
+        // If the RwLock is blocked this will not execute properly
+        // But terminated will mean no clients blocking the RwLock
+        // So if we default to false then we don't have to worry about things being blocked
+        futures::FutureExt::now_or_never(async {
+            self.read().await.is_terminated()
+        }).unwrap_or(false)
     }
 }
