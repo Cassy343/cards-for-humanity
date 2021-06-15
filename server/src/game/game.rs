@@ -16,7 +16,6 @@ use common::{
 use log::error;
 use rand::{thread_rng, Rng};
 use std::{
-    borrow::Borrow,
     cell::{RefCell, RefMut},
     collections::HashMap,
     rc::Rc,
@@ -89,8 +88,8 @@ impl Game {
             self.initialize_prompts();
         }
 
-        let card =
-            self.available_prompts[thread_rng().gen_range(0 .. self.available_prompts.len())];
+        let index = thread_rng().gen_range(0 .. self.available_prompts.len());
+        let card = self.available_prompts.remove(index);
         self.packs[card.pack_number].prompts[card.card_number].clone()
     }
 
@@ -100,8 +99,8 @@ impl Game {
                 self.initialize_responses();
             }
 
-            let card = self.available_responses
-                [thread_rng().gen_range(0 .. self.available_responses.len())];
+            let index = thread_rng().gen_range(0 .. self.available_responses.len());
+            let card = self.available_responses.remove(index);
             dest.push(ResponseData::new(
                 card,
                 self.packs[card.pack_number].responses[card.card_number].clone(),
