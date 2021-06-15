@@ -9,6 +9,10 @@
     <body>
 
         <div id="root">
+            <div id="game-end-menu" class="game-end-menu holder" hidden>
+                <div id="play-again-button" class="button">Play Again</div>
+                <div id="exit-button" class="button">Exit to Lobby</div>
+            </div>
             <div id="settings-menu" class="settings-menu holder" hidden>
                 <div class="settings box">
                     <div>Max Players: <input type="number" id="max-players"></input></div>
@@ -161,6 +165,48 @@
                 document.getElementById("server-list").innerHTML = "";
             }
 
+            function disable_hand() {
+                document.getElementById('hand').classList.add('disabled');
+            }
+
+            function enable_hand() {
+                document.getElementById('hand').classList.remove('disabled');
+            }
+
+            function show_game_end() {
+                document.getElementById("game-end-menu").hidden = false;
+            }
+
+            function hide_game_end() {
+                document.getElementById("game-end-menu").hidden = true;
+            }
+
+            function mark_winner(id) {
+                for(child of document.getElementById(`player-${id}-responses`).children) {
+                    child.classList.add('winner')
+                }
+            }
+
+            function enable_scrolling() {
+                document.body.style.overflow = "scroll";
+            }
+
+            function disable_scrolling() {
+                document.body.style.overflow = "hidden";
+            }
+
+            function disable_shadow() {
+                document.getElementById('shadow').hidden = true;
+            }
+
+            function enable_shadow() {
+                document.getElementById('shadow').hidden = false;
+            }
+
+            function clear_hand() {
+                document.getElementById('hand').innerHTML = '';
+            }
+
             // Events registered after the page has finished loading
             (() => {
                 const settings_div = document.getElementById("settings-menu");
@@ -178,17 +224,21 @@
                         update_settings_div.hidden = true;
                         create_settings_div.hidden = false;
                         shadow_div.hidden = false;
+                        window.scrollTo(0, 0);
+                        disable_scrolling()
                     }
                 };
 
                 document.getElementById("cancel-game").onclick = () => {
                     settings_div.hidden = true;
                     shadow_div.hidden = true;
+                    enable_scrolling()
                 };
 
                 document.getElementById("cancel-settings").onclick = () => {
                     settings_div.hidden = true;
                     shadow_div.hidden = true;
+                    enable_scrolling()
                 };
 
                 document.getElementById("game-settings-button").onclick = () => {
@@ -197,6 +247,8 @@
                     update_settings_div.hidden = false;
                     create_settings_div.hidden = true;
                     shadow_div.hidden = false;
+                    window.scrollTo(0, 0);
+                    disable_scrolling()
                 };
 
                 document.getElementById("new-packs-button").onclick = () => {

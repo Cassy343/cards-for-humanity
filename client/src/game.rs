@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    future::Future,
     sync::{mpsc::Receiver, Arc, Mutex},
 };
 
@@ -8,6 +9,7 @@ use common::{
     protocol::{
         clientbound::{ClientBoundPacket, PacketResponse, ResponseData},
         serverbound::ServerBoundPacket,
+        GameSetting,
         GameSettings,
     },
 };
@@ -17,35 +19,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::HtmlElement;
 
-use crate::{
-    console_log,
-    html::{
-        add_card_to_hand,
-        add_packs,
-        add_player,
-        add_server,
-        clear_player_marks,
-        clear_response_cards,
-        clear_servers,
-        get_hand_element,
-        get_name_input_value,
-        init_game,
-        init_lobby,
-        mark_player_czar,
-        mark_player_played,
-        place_blank_response,
-        remove_card_from_hand,
-        remove_player,
-        set_player_responses,
-        set_prompt_card,
-        set_user_name,
-        set_user_points,
-        update_player_name,
-        update_player_points,
-    },
-    js_events::register_events,
-    ws::WebSocket,
-};
+use crate::{console_log, html::{add_card_to_hand, add_packs, add_player, add_server, clear_hand, clear_player_marks, clear_response_cards, clear_servers, disable_hand, disable_shadow, enable_hand, enable_scrolling, enable_shadow, get_hand_element, get_name_input_value, init_game, init_lobby, mark_player_czar, mark_player_played, mark_winner, place_blank_response, remove_card_from_hand, remove_player, set_player_responses, set_prompt_card, set_user_name, set_user_points, show_game_end, update_player_name, update_player_points}, js_events::register_events, ws::WebSocket};
 
 
 #[derive(Clone)]
@@ -60,6 +34,7 @@ pub enum GameState {
     MakeResponse(u8),
     PickResponse(HashMap<Uuid, Vec<ResponseData>>),
     Waiting,
+    End
 }
 
 #[derive(Debug)]
@@ -127,10 +102,10 @@ pub fn game_init(socket: WebSocket, packet_receiver: Receiver<ClientBoundPacket>
 
     let game_manager = manager.clone();
 
-    let game_loop = Closure::<dyn FnMut()>::new(move || {
+    let game_loop = Closure::<FnMut()>::new(move || {
         while let Ok(packet) = packet_receiver.try_recv() {
             console_log!("Packet received: {:?}", packet);
-            game_loop(game_manager.clone(), packet)
+            game_loop(game_manager.clone(), packet);
         }
     });
 
@@ -178,10 +153,14 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             prompt,
             new_responses,
         } => {
+            clear_response_cards();
             manager.is_czar = manager.id == czar;
 
             if !manager.is_czar {
+                enable_hand();
                 mark_player_czar(&czar.to_string());
+            } else {
+                disable_hand();
             }
 
             manager
@@ -242,21 +221,24 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             }
         }
 
-        ClientBoundPacket::PlayerFinishedPicking(id) =>
-            if id != manager.id {
-                mark_player_played(&id.to_string());
-                place_blank_response();
-            },
+        ClientBoundPacket::PlayerFinishedPicking(id) => match manager.state {
+            GameState::PickResponse(_) => {}
+            _ =>
+                if id != manager.id {
+                    mark_player_played(&id.to_string());
+                    place_blank_response();
+                },
+        },
 
         ClientBoundPacket::DisplayWinner { winner, end_game } => {
-            clear_response_cards();
+            mark_winner(&winner.to_string());
 
             if end_game {
-                web_sys::window()
-                    .unwrap()
-                    .alert_with_message("THE GAME IS OVER")
-                    .unwrap();
-                panic!("PANIC")
+                manager.state = GameState::End;
+                disable_hand();
+                enable_shadow();
+                show_game_end();
+                clear_hand();
             } else {
                 if winner == manager.id {
                     manager.player.points += 1;
@@ -269,9 +251,13 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             }
         }
 
-        ClientBoundPacket::SettingUpdate(_settings) => {
-            // unimplemented!()
-        }
+        ClientBoundPacket::SettingUpdate(settings) => match settings {
+            GameSetting::AddPack(pack) => manager.settings.packs.push(pack),
+            GameSetting::MaxPlayers(max_players) => manager.settings.max_players = max_players,
+            GameSetting::MaxSelectionTime(time) => manager.settings.max_selection_time = time,
+            GameSetting::PointsToWin(points) => manager.settings.points_to_win = points,
+            GameSetting::RemovePack(pack) => manager.settings.packs.retain(|i| i != &pack),
+        },
 
         ClientBoundPacket::Ack {
             packet_id,
@@ -320,6 +306,8 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                                 .unwrap();
                             init_game();
                             ele.set_hidden(false);
+                            disable_shadow();
+                            enable_scrolling();
                         }
                         _ => todo!(),
                     }
@@ -344,6 +332,7 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
         ClientBoundPacket::ServerList { servers } => match manager.state {
             GameState::Lobby => {
                 drop(manager);
+                clear_servers();
                 for server in servers {
                     let ele = add_server(&server.0, server.1, server.2);
                     set_server_onclick(ele, server.0, manager_arc.clone())

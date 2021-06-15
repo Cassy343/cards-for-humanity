@@ -15,7 +15,6 @@ static SERVER_TEMPLATE: &'static str = include_str!("./templates/server_entry.ht
 // Template variables
 // $ID the id of the card
 // $TEXT the text of the card
-// $HAND_INDEX the index in the hand, defaults to 99
 pub fn response_card_html(card: &ResponseData) -> String {
     RESPONSE_TEMPLATE
         .replace(
@@ -298,5 +297,15 @@ extern "C" {
     pub fn clear_response_cards();
     pub fn place_blank_response();
     pub fn clear_servers();
+    pub fn disable_hand();
+    pub fn enable_hand();
+    pub fn show_game_end();
+    pub fn hide_game_end();
+    pub fn mark_winner(id: &str);
     fn get_current_packs() -> JsValue;
+    pub fn disable_shadow();
+    pub fn enable_shadow();
+    pub fn enable_scrolling();
+    pub fn disable_scrolling();
+    pub fn clear_hand();
 }

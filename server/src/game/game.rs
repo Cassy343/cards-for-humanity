@@ -1,5 +1,8 @@
 use super::packs::PackStore;
-use crate::network::{client::ClientHandler, Listener, NetworkHandler};
+use crate::{
+    network::{client::ClientHandler, Listener, NetworkHandler},
+    LOBBY_ID,
+};
 use async_trait::async_trait;
 use common::{
     data::{
@@ -521,13 +524,76 @@ impl Listener for Game {
                 )
                 .await;
 
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+
                 if end_game {
                     self.state = GameState::End;
                 } else {
                     self.next_round(network_handler).await;
                 }
             }
-            GameState::End => {}
+            GameState::End => {
+                match packet {
+                    ServerBoundPacket::LeaveGame => {
+                        network_handler
+                        .forward_client(sender_id, *LOBBY_ID.get().unwrap())
+                        .await
+                        .unwrap();
+                    },
+                    ServerBoundPacket::StartGame => {
+                        if self.host_id != sender_id {
+                            return PacketResponse::Rejected;
+                        }
+
+                        for (_, player) in self.players.iter_mut() {
+                            player.points = 0;
+                            player.selections = Vec::new();
+                        }
+
+
+                        // TODO: Initialize round
+                        self.initialize_prompts();
+                        self.initialize_responses();
+
+                        // This branch should never be taken
+                        if self.available_responses.is_empty() || self.available_prompts.is_empty()
+                        {
+                            return PacketResponse::RejectedWithReason(
+                                "No packs selected".to_owned(),
+                            );
+                        }
+
+                        // Select the first czar
+                        self.czar_index = thread_rng().gen_range(0 .. self.players.len());
+
+                        // Select the prompt
+                        let prompt = self.select_prompt();
+
+                        let mut client_handler = network_handler.client_handler.lock().await;
+                        for index in 0 .. self.players.len() {
+                            let mut responses = Vec::with_capacity(10);
+                            self.add_responses(&mut responses, 10);
+
+                            let round_data = ClientBoundPacket::NextRound {
+                                czar: self.players[self.czar_index].0,
+                                prompt: prompt.clone(),
+                                new_responses: responses,
+                            };
+
+                            client_handler
+                                .send_packets(self.players[index].0, &[
+                                    ClientBoundPacket::StartGame,
+                                    round_data,
+                                ])
+                                .await;
+                        }
+
+                        self.current_prompt = Some(prompt);
+                        self.state = GameState::Playing(PlayingState::PlayerSelection);
+                    },
+                    _ => {}
+                }
+            }
         }
 
         PacketResponse::Accepted
