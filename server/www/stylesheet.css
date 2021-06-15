@@ -3,9 +3,6 @@
     border-style: solid;
     padding: 30px;
     padding-top: 10px;
-    margin-left: 10px;
-    margin-top: 10px;
-    margin-bottom: 5px;
     width: 120px;
     min-height: 140px;
     font-size: 90%;
@@ -32,11 +29,22 @@
     background-color: black;
     color: white;
     border-color: black;
+    margin-left: 10px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+.winner {
+    background-color: rgb(102, 223, 102);
 }
 
 .hand {
     border-top-style: none;
     min-height: 140px;
+}
+
+.disabled {
+    background: rgba(39, 39, 39, 0.8) !important;
 }
 
 .played {
@@ -72,7 +80,7 @@
 }
 
 .picked {
-    background-color: greenyellow;
+    background-color: rgb(102, 223, 102);
 }
 
 .czar {
@@ -134,12 +142,12 @@
     z-index: 1;
 }
 
-#background {
+#shadow {
     position:absolute;
     top:0;
     left:0;
-    width:100%;
-    height:100%;
+    width:100vw;
+    height:100vh;
     background: rgba(39, 39, 39, 0.8);
     z-index:0;
 }
@@ -169,4 +177,12 @@
 
 .player-responses {
     border-radius: 25px;
+    border-style: none;
+    background-color: rgb(116, 132, 151);
+    margin: 10px;
+}
+
+.game-end-menu {
+    z-index: 1;
+    position: relative;
 }

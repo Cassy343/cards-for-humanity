@@ -4,10 +4,7 @@ use common::protocol::serverbound::ServerBoundPacket;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::HtmlElement;
 
-use crate::{
-    game::{GameManager, GameState},
-    html::{get_name_input, get_name_input_value, get_settings, init_game, set_user_name},
-};
+use crate::{game::{GameManager, GameState}, html::{disable_hand, disable_shadow, get_name_input, get_name_input_value, get_settings, hide_game_end, init_game, init_lobby, set_user_name}};
 
 pub fn register_events(manager: Arc<Mutex<GameManager>>) {
     let window = web_sys::window().unwrap();
@@ -71,4 +68,45 @@ pub fn register_events(manager: Arc<Mutex<GameManager>>) {
 
     start_game_button.set_onclick(Some(start_game_click.as_ref().unchecked_ref()));
     start_game_click.forget();
+
+    let exit_button: HtmlElement = document
+        .get_element_by_id("exit-button")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
+    let exit_manager = manager.clone();
+
+    let exit_game_click = Closure::<dyn FnMut()>::new(move || {
+        let manager_arc = exit_manager.clone();
+        let mut manager = manager_arc.lock().unwrap();
+        manager.state = GameState::Lobby;
+        let socket = manager.socket.lock().unwrap();
+        socket.send_packet(&ServerBoundPacket::LeaveGame).unwrap();
+        hide_game_end();
+        disable_shadow();
+        init_lobby();
+    });
+
+    exit_button.set_onclick(Some(exit_game_click.as_ref().unchecked_ref()));
+    exit_game_click.forget();
+
+    let play_again_button: HtmlElement = document
+        .get_element_by_id("play-again-button")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
+    let again_manager = manager.clone();
+
+    let again_click = Closure::<dyn FnMut()>::new(move || {
+        let manager_arc = again_manager.clone();
+        let manager = manager_arc.lock().unwrap();
+        hide_game_end();
+        disable_shadow();
+        if manager.host == manager.id {
+            start_game_button.clone().set_hidden(false);
+        }
+    });
+
+    play_again_button.set_onclick(Some(again_click.as_ref().unchecked_ref()));
+    again_click.forget();
 }

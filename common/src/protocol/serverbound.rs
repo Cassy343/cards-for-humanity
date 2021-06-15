@@ -38,6 +38,7 @@ pub enum ServerBoundPacket {
     UpdateSetting(GameSetting),
     SelectResponse(CardID),
     SelectRoundWinner(Uuid),
+    LeaveGame,
 
     // Lobby packets
     CreateServer(GameSettings),
