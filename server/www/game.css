@@ -181,3 +181,8 @@
     flex-direction: column;
     align-items: center;
 }
+
+#played-cards {
+    display: flex;
+    flex-direction: row;
+}

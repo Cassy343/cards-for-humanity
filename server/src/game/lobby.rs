@@ -48,7 +48,7 @@ impl Listener for Lobby {
             .send_packet(client_id, &ClientBoundPacket::ServerList {
                 servers: games
                     .iter()
-                    .map(|g| (g.id, g.num_players(), g.max_players))
+                    .map(|g| (g.id, g.host_name(), g.num_players(), g.max_players))
                     .collect(),
             })
             .await
@@ -85,12 +85,12 @@ impl Listener for Lobby {
         match packet {
             ServerBoundPacket::CreateServer(settings) => {
                 if settings.packs.len() == 0 {
-                    return PacketResponse::RejectedWithReason("Packs cannot be emppty".to_owned());
+                    return PacketResponse::RejectedWithReason("Packs cannot be empty".to_owned());
                 }
 
                 if settings.points_to_win == 0 {
                     return PacketResponse::RejectedWithReason(
-                        "Point to win has to be at least 1".to_owned(),
+                        "Points to win has to be at least 1".to_owned(),
                     );
                 }
 
@@ -152,7 +152,7 @@ impl Listener for Lobby {
                 PacketResponse::Accepted
             }
 
-            _ => PacketResponse::Rejected,
+            _ => PacketResponse::RejectedWithReason("Unexpected packet type in lobby".to_owned()),
         }
     }
 

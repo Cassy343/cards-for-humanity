@@ -47,9 +47,10 @@ pub fn player_response_html(id: &Uuid) -> String {
     PLAYER_RESPONSE_TEMPLATE.replace("$ID", &id.to_string())
 }
 
-pub fn server_html(id: &Uuid, player_count: usize, max_players: usize) -> String {
+pub fn server_html(id: &Uuid, name: &str, player_count: usize, max_players: usize) -> String {
     SERVER_TEMPLATE
         .replace("$SERVER_ID", &id.to_string())
+        .replace("$SERVER_NAME", name)
         .replace("$PLAYER_NUM", &player_count.to_string())
         .replace("$MAX_PLAYERS", &max_players.to_string())
 }
@@ -100,7 +101,12 @@ pub fn init_lobby() {
     game.set_hidden(true);
 }
 
-pub fn add_server(server_id: &Uuid, num_players: usize, max_players: Option<usize>) -> HtmlElement {
+pub fn add_server(
+    server_id: &Uuid,
+    name: &str,
+    num_players: usize,
+    max_players: Option<usize>,
+) -> HtmlElement {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     let server_list = document.get_element_by_id("game-list").unwrap();
@@ -110,6 +116,7 @@ pub fn add_server(server_id: &Uuid, num_players: usize, max_players: Option<usiz
     let server_entry = server_list.last_element_child().unwrap();
     server_entry.set_outer_html(&server_html(
         server_id,
+        name,
         num_players,
         max_players.unwrap_or(0),
     ));
@@ -220,18 +227,6 @@ pub fn add_player(player: &Player, id: &Uuid) {
     ))
 }
 
-pub fn get_selected_new_packs() -> Vec<String> {
-    let arr: Array = get_selected_packs().dyn_into().unwrap();
-
-    let mut output = Vec::new();
-
-    for i in 0 .. arr.length() {
-        output.push(arr.get(i).as_string().unwrap())
-    }
-
-    output
-}
-
 pub fn add_packs(packs: Vec<(String, usize, usize)>) {
     for (pack, prompts, responses) in packs {
         add_pack(pack, prompts, responses);
@@ -302,4 +297,7 @@ extern "C" {
     pub fn mark_winner(id: &str);
     fn get_current_packs() -> JsValue;
     pub fn clear_hand();
+    pub fn disable_start_game();
+    pub fn clear_blank_responses();
+    pub fn remove_response(id: &str);
 }

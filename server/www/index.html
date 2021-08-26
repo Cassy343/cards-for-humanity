@@ -133,7 +133,7 @@
 
             for (row of ele.rows) {
                 let check_box = row.cells[0].children[0];
-                let name = row.cells[1].innerHTML;
+                let name = row.cells[1].innerText;
                 if (check_box && name && check_box.checked)
                     output.push(name)
             }
@@ -148,11 +148,11 @@
         }
 
         function clear_player_marks(id) {
-            document.getElementById(`player-${id}`).classList.remove("czar", "picked");
+            document.getElementById(`player-${id}`).classList.remove("czar", "played");
         }
 
         function mark_player_played(id) {
-            document.getElementById(`player-${id}`).classList.add("picked");
+            document.getElementById(`player-${id}`).classList.add("played");
         }
 
         function mark_player_czar(id) {
@@ -179,8 +179,24 @@
             document.getElementById("played-cards").innerHTML = "";
         }
 
+        function clear_blank_responses() {
+            let cards = document.getElementsByClassName('blank-card');
+
+            // apparently cards is a live list
+            while(cards[0]) {
+                cards[0].parentNode.removeChild(cards[0])
+            }
+        }
+
+        function remove_response(id) {
+            let ele = document.getElementById(`player-${id}-responses`);
+            ele.parentNode.removeChild(ele);
+        }
+
         function place_blank_response() {
-            document.getElementById("played-cards").innerHTML += `<div class="white-card card"></div>`;
+            // If this is the final response we don't place it because we usually recieve the FinishedPicking packet after the DisplayResponses packet
+            if(document.getElementById('played-cards').children.length + 2 != document.getElementById('players-list').children.length)
+                document.getElementById("played-cards").innerHTML += `<div class="white-card card blank-card"></div>`;
         }
 
         function clear_servers() {
@@ -213,6 +229,10 @@
 
         function clear_hand() {
             document.getElementById('hand').innerHTML = '';
+        }
+
+        function disable_start_game() {
+            document.getElementById('game-start-button').hidden = true;
         }
 
         // Events registered after the page has finished loading

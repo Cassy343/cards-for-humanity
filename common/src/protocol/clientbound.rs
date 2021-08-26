@@ -41,7 +41,7 @@ pub enum ClientBoundPacket {
         response: PacketResponse,
     },
     ServerList {
-        servers: Vec<(Uuid, usize, Option<usize>)>,
+        servers: Vec<(Uuid, String, usize, Option<usize>)>,
     },
     CardPacks(Vec<(String, usize, usize)>),
 }

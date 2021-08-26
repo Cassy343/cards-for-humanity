@@ -72,6 +72,10 @@ impl Game {
         })
     }
 
+    pub fn host_name(&self) -> String {
+        self.players.get(&self.host_id).unwrap().name.clone()
+    }
+
     fn initialize_prompts(&mut self) {
         for (index, pack) in self.packs.iter().enumerate() {
             self.available_prompts
@@ -219,11 +223,6 @@ impl Game {
 #[async_trait(?Send)]
 impl Listener for Game {
     async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
-        match self.state {
-            GameState::Playing(_) => return,
-            _ => {}
-        }
-
         let set_host = self.players.is_empty();
         if set_host {
             self.host_id = client_id;
@@ -292,10 +291,21 @@ impl Listener for Game {
         // Cancel the round if the czar left
         let skip_round = client_id == self.players[self.czar_index].0;
 
+        let index = self
+            .players
+            .iter()
+            .enumerate()
+            .find(|p| p.1 .0 == client_id)
+            .unwrap()
+            .0;
         let player = match self.players.remove(&client_id) {
             Some(player) => player,
             None => return,
         };
+
+        if self.czar_index > index {
+            self.czar_index -= 1;
+        }
 
         let new_host = if player.is_host {
             self.players
@@ -338,6 +348,27 @@ impl Listener for Game {
         packet: &ServerBoundPacket,
         sender_id: Uuid,
     ) -> PacketResponse {
+        // Packets we want to respond to no matter what state we're in
+        match packet {
+            ServerBoundPacket::SetPlayerName(name) => {
+                if let Some(player) = self.players.get_mut(&sender_id) {
+                    player.name = name.clone();
+                    self.broadcast_to_players(
+                        &mut network_handler.client_handler.lock().await,
+                        &ClientBoundPacket::UpdatePlayerName {
+                            id: sender_id,
+                            name: name.clone(),
+                        },
+                    )
+                    .await;
+                    return PacketResponse::Accepted;
+                } else {
+                    return PacketResponse::Rejected;
+                }
+            }
+            _ => {}
+        }
+
         match self.state {
             GameState::WaitingToStart => {
                 match packet {
@@ -423,20 +454,6 @@ impl Listener for Game {
                             &ClientBoundPacket::echo_setting_update(setting),
                         )
                         .await;
-                    }
-
-                    ServerBoundPacket::SetPlayerName(name) => {
-                        if let Some(player) = self.players.get_mut(&sender_id) {
-                            player.name = name.clone();
-                            self.broadcast_to_players(
-                                &mut network_handler.client_handler.lock().await,
-                                &ClientBoundPacket::UpdatePlayerName {
-                                    id: sender_id,
-                                    name: name.clone(),
-                                },
-                            )
-                            .await;
-                        }
                     }
 
                     _ => return PacketResponse::Rejected,
@@ -541,10 +558,10 @@ impl Listener for Game {
                 match packet {
                     ServerBoundPacket::LeaveGame => {
                         network_handler
-                        .forward_client(sender_id, *LOBBY_ID.get().unwrap())
-                        .await
-                        .unwrap();
-                    },
+                            .forward_client(sender_id, *LOBBY_ID.get().unwrap())
+                            .await
+                            .unwrap();
+                    }
                     ServerBoundPacket::StartGame => {
                         if self.host_id != sender_id {
                             return PacketResponse::Rejected;
@@ -595,7 +612,7 @@ impl Listener for Game {
 
                         self.current_prompt = Some(prompt);
                         self.state = GameState::Playing(PlayingState::PlayerSelection);
-                    },
+                    }
                     _ => {}
                 }
             }

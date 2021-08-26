@@ -117,4 +117,23 @@ pub fn register_events(manager: Arc<Mutex<GameManager>>) {
 
     play_again_button.set_onclick(Some(again_click.as_ref().unchecked_ref()));
     again_click.forget();
+
+    let refresh_button: HtmlElement = document
+        .get_element_by_id("refresh-button")
+        .unwrap()
+        .dyn_into()
+        .unwrap();
+    let refresh_manager = manager.clone();
+
+    let refresh_click = Closure::<dyn FnMut()>::new(move || {
+        let manager_arc = refresh_manager.clone();
+        let manager = manager_arc.lock().unwrap();
+        let socket = manager.socket.lock().unwrap();
+        socket
+            .send_packet(&ServerBoundPacket::RefreshServerList)
+            .unwrap();
+    });
+
+    refresh_button.set_onclick(Some(refresh_click.as_ref().unchecked_ref()));
+    refresh_click.forget();
 }

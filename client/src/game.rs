@@ -1,11 +1,10 @@
 use std::{
     collections::HashMap,
-    future::Future,
     sync::{mpsc::Receiver, Arc, Mutex},
 };
 
 use common::{
-    data::cards::{CardID, Pack},
+    data::cards::CardID,
     protocol::{
         clientbound::{ClientBoundPacket, PacketResponse, ResponseData},
         serverbound::ServerBoundPacket,
@@ -26,11 +25,13 @@ use crate::{
         add_packs,
         add_player,
         add_server,
+        clear_blank_responses,
         clear_hand,
         clear_player_marks,
         clear_response_cards,
         clear_servers,
         disable_hand,
+        disable_start_game,
         enable_hand,
         get_hand_element,
         get_name_input_value,
@@ -42,6 +43,7 @@ use crate::{
         place_blank_response,
         remove_card_from_hand,
         remove_player,
+        remove_response,
         set_player_responses,
         set_prompt_card,
         show_game_end,
@@ -155,7 +157,10 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
         .expect("Error getting mut for GameManager");
 
     match packet {
-        ClientBoundPacket::SetId(id) => manager.id = id,
+        ClientBoundPacket::SetId(id) => {
+            add_player(&manager.player, &id);
+            manager.id = id
+        }
         ClientBoundPacket::AddPlayer {
             id,
             name,
@@ -184,11 +189,17 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             new_responses,
         } => {
             clear_response_cards();
+
+            for (id, _) in &manager.others {
+                clear_player_marks(&id.to_string())
+            }
+            clear_player_marks(&manager.id.to_string());
+
             manager.is_czar = manager.id == czar;
 
+            mark_player_czar(&czar.to_string());
             if !manager.is_czar {
                 enable_hand();
-                mark_player_czar(&czar.to_string());
             } else {
                 disable_hand();
             }
@@ -218,10 +229,6 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
         ClientBoundPacket::DisplayResponses(responses) => {
             clear_response_cards();
 
-            for (id, _) in &manager.others {
-                clear_player_marks(&id.to_string())
-            }
-
             manager.state = GameState::PickResponse(responses.clone());
             drop(manager);
 
@@ -229,10 +236,12 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                 let element = set_player_responses(id, responses);
                 set_response_onclick(element, *id, manager_arc.clone())
             });
+            // clear blank responses to just get any somehow left out
+            // they technically could come in because we drop manager earlier
+            clear_blank_responses();
         }
 
         ClientBoundPacket::StartGame => {
-            add_player(&manager.player, &manager.id);
             update_player_points(&manager.id.to_string(), manager.player.points);
         }
 
@@ -246,18 +255,28 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             remove_player(&id.to_string());
             manager.others.remove(&id);
 
+            match &mut manager.state {
+                GameState::PickResponse(ref mut responses) => {
+                    responses.remove(&id);
+                    remove_response(&id.to_string());
+                }
+                _ => {}
+            }
+
             if let Some(host_id) = new_host {
                 manager.host = host_id;
             }
         }
 
         ClientBoundPacket::PlayerFinishedPicking(id) => match manager.state {
+            // Should generally never occur
             GameState::PickResponse(_) => {}
-            _ =>
+            _ => {
+                mark_player_played(&id.to_string());
                 if id != manager.id {
-                    mark_player_played(&id.to_string());
                     place_blank_response();
-                },
+                }
+            }
         },
 
         ClientBoundPacket::DisplayWinner { winner, end_game } => {
@@ -304,7 +323,10 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                     match cached {
                         CachedPacket::SelectResponse(card, card_index) => {
                             remove_card_from_hand(card_index as u8);
-                            place_blank_response();
+                            match manager.state {
+                                GameState::PickResponse(_) => {}
+                                _ => place_blank_response(),
+                            }
                             manager.hand.remove(card_index);
                             manager.hand_closures.remove(&card.id);
                         }
@@ -321,6 +343,7 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                                     manager.player.name.clone(),
                                 ))
                                 .unwrap();
+                            disable_start_game();
                             init_game();
                             clear_servers();
                         }
@@ -361,7 +384,7 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                 drop(manager);
                 clear_servers();
                 for server in servers {
-                    let ele = add_server(&server.0, server.1, server.2);
+                    let ele = add_server(&server.0, &server.1, server.2, server.3);
                     set_server_onclick(ele, server.0, manager_arc.clone())
                 }
             }
