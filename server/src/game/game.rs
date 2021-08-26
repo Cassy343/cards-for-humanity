@@ -219,6 +219,11 @@ impl Game {
 #[async_trait(?Send)]
 impl Listener for Game {
     async fn client_connected(&mut self, network_handler: &mut NetworkHandler, client_id: Uuid) {
+        match self.state {
+            GameState::Playing(_) => return,
+            _ => {}
+        }
+
         let set_host = self.players.is_empty();
         if set_host {
             self.host_id = client_id;

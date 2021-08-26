@@ -1,0 +1,79 @@
+#lobby {
+    min-height: 100vh;
+    min-width: 100vh;
+    color: black;
+    position: sticky;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#lobby-list-holder {
+    display: flex;
+    flex-direction: row;
+}
+
+#game-list-div {
+    background-color: white;
+    border-color: black;
+    border-width: 2px;
+    border-style: solid;
+    border-radius: 9px;
+    color: black;
+    min-height: 400px;
+    margin-bottom: 10px;
+    overflow: auto;
+}
+
+#logo {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 120px;
+    color: black;
+    line-height: 100px;
+}
+
+table {
+    border-spacing: 0px;
+    min-width: 400px;
+    border-collapse: collapse;
+    border-style: 8px;
+}
+
+tr td:first-child,
+tr th:first-child {
+    border-left-style: none;
+}
+
+tr td:last-child,
+tr th:last-child {
+    border-right: none;
+}
+
+th,
+td {
+    text-align: center;
+    border-style: solid;
+    border-top-style: none;
+    border-width: 2px;
+    border-color: black;
+    margin: 0px;
+    padding: 0px;
+}
+
+#player-name-input-lobby {
+    border-color: black;
+    border-radius: 5px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+#refresh-button {
+    color: black;
+    line-height: 8px;
+}
+
+#create-game-button {
+    line-height: 14px;
+    margin-bottom: 4px;
+}

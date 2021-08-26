@@ -63,12 +63,12 @@ pub fn init_game() {
         .dyn_into::<HtmlElement>()
         .unwrap();
     let lobby = document
-        .get_element_by_id("lobby")
+        .get_element_by_id("lobby-holder")
         .unwrap()
         .dyn_into::<HtmlElement>()
         .unwrap();
     let game = document
-        .get_element_by_id("game")
+        .get_element_by_id("game-holder")
         .unwrap()
         .dyn_into::<HtmlElement>()
         .unwrap();
@@ -91,7 +91,7 @@ pub fn init_lobby() {
         .dyn_into::<HtmlElement>()
         .unwrap();
     let game = document
-        .get_element_by_id("game")
+        .get_element_by_id("game-holder")
         .unwrap()
         .dyn_into::<HtmlElement>()
         .unwrap();
@@ -103,7 +103,7 @@ pub fn init_lobby() {
 pub fn add_server(server_id: &Uuid, num_players: usize, max_players: Option<usize>) -> HtmlElement {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
-    let server_list = document.get_element_by_id("server-list").unwrap();
+    let server_list = document.get_element_by_id("game-list").unwrap();
 
     let base_element = document.create_element("div").unwrap();
     server_list.append_child(&base_element).unwrap();
@@ -221,7 +221,7 @@ pub fn add_player(player: &Player, id: &Uuid) {
 }
 
 pub fn get_selected_new_packs() -> Vec<String> {
-    let arr: Array = get_selected_packs(true).dyn_into().unwrap();
+    let arr: Array = get_selected_packs().dyn_into().unwrap();
 
     let mut output = Vec::new();
 
@@ -232,9 +232,9 @@ pub fn get_selected_new_packs() -> Vec<String> {
     output
 }
 
-pub fn add_packs(packs: Vec<String>) {
-    for pack in packs {
-        add_pack(pack);
+pub fn add_packs(packs: Vec<(String, usize, usize)>) {
+    for (pack, prompts, responses) in packs {
+        add_pack(pack, prompts, responses);
     }
 }
 
@@ -283,10 +283,8 @@ extern "C" {
     // All ids are sent in as &str
     // This is because sending Rust types to JS is a pain
     // And since they get simplified to JS strings anyway when used this doesn't matter
-    fn get_selected_packs(new_packs: bool) -> JsValue;
-    fn add_pack(new_pack: String);
-    pub fn set_user_points(points: u32);
-    pub fn set_user_name(name: &str);
+    fn get_selected_packs() -> JsValue;
+    fn add_pack(new_pack: String, prompts: usize, responses: usize);
     pub fn clear_player_marks(id: &str);
     pub fn mark_player_czar(id: &str);
     pub fn mark_player_played(id: &str);
@@ -303,9 +301,5 @@ extern "C" {
     pub fn hide_game_end();
     pub fn mark_winner(id: &str);
     fn get_current_packs() -> JsValue;
-    pub fn disable_shadow();
-    pub fn enable_shadow();
-    pub fn enable_scrolling();
-    pub fn disable_scrolling();
     pub fn clear_hand();
 }

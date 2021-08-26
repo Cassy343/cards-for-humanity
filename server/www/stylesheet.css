@@ -1,3 +1,15 @@
+@font-face {
+    font-family: 'JetBrains';
+    src: url(https://github.com/JetBrains/JetBrainsMono/blob/master/fonts/ttf/JetBrainsMono-Regular.ttf);
+}
+
+body {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    margin: 0px;
+    background: rgb(48, 128, 160);
+    padding: 0px;
+}
+
 .card {
     border-radius: 25px;
     border-style: solid;
@@ -105,32 +117,27 @@
 
 .button {
     border-width: 2px;
-    border-radius: 20px;
+    border-radius: 7px;
     border-color: black;
     border-style: solid;
-    background-color: dimgray;
+    background-color: white;
     padding: 3px;
     max-width: max-content;
     max-height: max-content;
 }
 
+.server-entry:hover,
 .button:hover {
-    background-color: rgb(116, 132, 151);
-    
+    background-color: rgb(166, 170, 173);
+
 }
 
+.server-entry:active,
 .button:active {
-    background-color: rgb(51, 54, 71);
+    background-color: rgb(111, 112, 119);
 }
 
 .game {
-    position: absolute;
-    z-index: -1;
-    min-height: 80%;
-    min-width: 95%;
-}
-
-.lobby {
     position: absolute;
     z-index: -1;
     min-height: 80%;
@@ -150,29 +157,6 @@
     height:100vh;
     background: rgba(39, 39, 39, 0.8);
     z-index:0;
-}
-
-.server-entry {
-    border-radius: 25px;
-    border-style: solid;
-    padding: 30px;
-    padding-top: 10px;
-    margin-left: 10px;
-    margin-top: 10px;
-    margin-bottom: 5px;
-    width: 120px;
-    min-height: 140px;
-    font-size: 90%;
-    border-color: black;
-    background: white;
-}
-
-.server-entry:hover {
-    background: rgb(189, 189, 189);
-}
-
-.server-entry:active {
-    background-color: rgb(126, 126, 126);
 }
 
 .player-responses {

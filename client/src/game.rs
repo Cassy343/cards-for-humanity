@@ -5,7 +5,7 @@ use std::{
 };
 
 use common::{
-    data::cards::CardID,
+    data::cards::{CardID, Pack},
     protocol::{
         clientbound::{ClientBoundPacket, PacketResponse, ResponseData},
         serverbound::ServerBoundPacket,
@@ -19,7 +19,38 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::HtmlElement;
 
-use crate::{console_log, html::{add_card_to_hand, add_packs, add_player, add_server, clear_hand, clear_player_marks, clear_response_cards, clear_servers, disable_hand, disable_shadow, enable_hand, enable_scrolling, enable_shadow, get_hand_element, get_name_input_value, init_game, init_lobby, mark_player_czar, mark_player_played, mark_winner, place_blank_response, remove_card_from_hand, remove_player, set_player_responses, set_prompt_card, set_user_name, set_user_points, show_game_end, update_player_name, update_player_points}, js_events::register_events, ws::WebSocket};
+use crate::{
+    console_log,
+    html::{
+        add_card_to_hand,
+        add_packs,
+        add_player,
+        add_server,
+        clear_hand,
+        clear_player_marks,
+        clear_response_cards,
+        clear_servers,
+        disable_hand,
+        enable_hand,
+        get_hand_element,
+        get_name_input_value,
+        init_game,
+        init_lobby,
+        mark_player_czar,
+        mark_player_played,
+        mark_winner,
+        place_blank_response,
+        remove_card_from_hand,
+        remove_player,
+        set_player_responses,
+        set_prompt_card,
+        show_game_end,
+        update_player_name,
+        update_player_points,
+    },
+    js_events::register_events,
+    ws::WebSocket,
+};
 
 
 #[derive(Clone)]
@@ -34,7 +65,7 @@ pub enum GameState {
     MakeResponse(u8),
     PickResponse(HashMap<Uuid, Vec<ResponseData>>),
     Waiting,
-    End
+    End,
 }
 
 #[derive(Debug)]
@@ -55,21 +86,20 @@ pub struct GameManager {
     pub is_czar: bool,
     pub host: Uuid,
     pub socket: Arc<Mutex<WebSocket>>,
-    /// We store the card closures to appropriately drop them when we need to
-    /// normally we would .forget() the Closures but since we register a lot of Closures
-    /// we want to responsibly drop them to avoid leaking memory
+    // We store the card closures to appropriately drop them when we need to
+    // normally we would .forget() the Closures but since we register a lot of Closures
+    // we want to responsibly drop them to avoid leaking memory
     hand_closures: HashMap<CardID, Closure<dyn FnMut()>>,
     response_closures: Vec<Closure<dyn FnMut()>>,
     server_closures: Vec<Closure<dyn FnMut()>>,
     pub settings: GameSettings,
-    pub known_packs: Vec<String>,
+    pub known_packs: Vec<(String, usize, usize)>,
 }
 
 
 pub fn game_init(socket: WebSocket, packet_receiver: Receiver<ClientBoundPacket>) {
     // Get the value of the name input because the browser can save it so we can't just detect it on change
     let name = get_name_input_value();
-    set_user_name(&name);
 
     let manager = Arc::new(Mutex::new(GameManager {
         player: Player {
@@ -102,7 +132,7 @@ pub fn game_init(socket: WebSocket, packet_receiver: Receiver<ClientBoundPacket>
 
     let game_manager = manager.clone();
 
-    let game_loop = Closure::<FnMut()>::new(move || {
+    let game_loop = Closure::<dyn FnMut()>::new(move || {
         while let Ok(packet) = packet_receiver.try_recv() {
             console_log!("Packet received: {:?}", packet);
             game_loop(game_manager.clone(), packet);
@@ -202,8 +232,8 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
         }
 
         ClientBoundPacket::StartGame => {
-            set_user_name(&manager.player.name);
-            set_user_points(manager.player.points);
+            add_player(&manager.player, &manager.id);
+            update_player_points(&manager.id.to_string(), manager.player.points);
         }
 
         ClientBoundPacket::UpdatePlayerName { id, name } =>
@@ -236,13 +266,12 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
             if end_game {
                 manager.state = GameState::End;
                 disable_hand();
-                enable_shadow();
                 show_game_end();
                 clear_hand();
             } else {
                 if winner == manager.id {
                     manager.player.points += 1;
-                    set_user_points(manager.player.points);
+                    update_player_points(&manager.id.to_string(), manager.player.points);
                 } else {
                     let player = manager.others.get_mut(&winner).unwrap();
                     player.points += 1;
@@ -306,8 +335,6 @@ fn game_loop(manager_arc: Arc<Mutex<GameManager>>, packet: ClientBoundPacket) {
                                 .unwrap();
                             init_game();
                             ele.set_hidden(false);
-                            disable_shadow();
-                            enable_scrolling();
                         }
                         _ => todo!(),
                     }

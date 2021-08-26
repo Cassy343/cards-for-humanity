@@ -10,7 +10,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     add_directory_recursively(&mut zip_writer, "www")?;
     add_directory_recursively(&mut zip_writer, "packs")?;
-    add_directory_recursively(&mut zip_writer, "../frontend/dist/")?;
 
     zip_writer.add_directory("www/client", Default::default())?;
     copy_client_file(&mut zip_writer, "client.js")?;

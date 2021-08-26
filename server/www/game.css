@@ -1,0 +1,183 @@
+#game {
+    display: flex;
+    flex-direction: row;
+    color: black;
+    min-height: 100vh;
+    min-width: 100vh;
+    overflow: hidden;
+}
+
+.card {
+    border-radius: 25px;
+    border-style: solid;
+    padding: 30px;
+    padding-top: 10px;
+    width: 120px;
+    min-height: 140px;
+    font-size: 90%;
+
+}
+
+@keyframes card-shadow {
+    from {
+        box-shadow: 0px 0px 0rem black
+    }
+
+    to {
+        box-shadow: 0px 5px 0.5rem black
+    }
+}
+
+.card:hover {
+    box-shadow: 0px 5px 0.5rem black;
+    animation-name: card-shadow;
+    animation-duration: 0.5s;
+}
+
+.white-card {
+    border-color: black;
+    background: white;
+    margin: 10px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.black-card {
+    background-color: black;
+    color: white;
+    border-color: black;
+    margin-left: 10px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+#board-holder {
+    display: flex;
+    flex-direction: column;
+    min-width: 80vw;
+    flex-basis: 50%;
+}
+
+#players-list {
+    display: flex;
+    flex-direction: column;
+    border-style: solid;
+    border-width: 4px;
+    border-color: black;
+    border-top-style: none;
+    border-left-style: none;
+    min-width: 15vw;
+    height: 94vh;
+    overflow: auto;
+    align-items: center;
+}
+
+#played-div {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-width: 4px;
+    border-style: solid;
+    border-color: black;
+    border-left-style: none;
+    border-top-style: none;
+    border-right-style: none;
+    width: calc(85vw - 5px);
+    height: calc(50vh - 3px);
+    overflow: auto;
+}
+
+#hand {
+    border-top-style: none;
+    border-bottom-style: none;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    position: relative;
+    overflow: auto;
+}
+
+#hand-box {
+    border-width: 4px;
+    border-style: solid;
+    border-color: black;
+    border-top-style: none;
+    border-bottom-style: none;
+    border-left-style: none;
+    border-right-style: none;
+    display: flex;
+    width: calc(85vw - 5px);
+    height: calc(50vh);
+    overflow: auto;
+}
+
+.player {
+    display: flex;
+    flex-direction: column;
+    border-style: solid;
+    background-color: white;
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    padding-left: 25%;
+    padding-right: 25%;
+}
+
+.czar {
+    background-color: rgb(129, 198, 255);
+}
+
+.played {
+    background-color: #787878;
+}
+
+.player:first-child {
+    padding: 20px;
+    padding-left: 25%;
+    padding-right: 25%;
+}
+
+#hand-czar-overlay {
+    position: absolute;
+    background-color: rgba(80, 80, 80, 0.767);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: calc(85vw - 5px);
+    height: calc(50vh);
+    overflow: hidden;
+}
+
+#hand-czar-message {
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    top: 40%;
+    text-align: center;
+    align-self: center;
+    background-color: white;
+    border-style: solid;
+    border-radius: 5px;
+    border-width: 4px;
+    padding: 20px;
+    font-size: 30px;
+
+}
+
+#left-side-div {
+    display: flex;
+    flex-direction: column;
+}
+
+#settings-button {
+    margin: 3px;
+}
+
+#settings-holder {
+    border-right-style: solid;
+    border-width: 4px;
+    height: 7vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}

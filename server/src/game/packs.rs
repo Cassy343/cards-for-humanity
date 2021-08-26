@@ -16,8 +16,9 @@ const DEFAULT_PACK_JSON: &str = "CAH Base Set.json";
 pub struct PackStore {
     pack_dir: PathBuf,
     loaded_packs: HashMap<String, Rc<Pack>>,
-    official_packs: Vec<String>,
-    possible_packs: Vec<String>,
+    // bool is if the pack is official
+    // usizes are prompts and responses respectively
+    possible_packs: HashMap<String, (bool, usize, usize)>,
 }
 
 impl PackStore {
@@ -28,8 +29,12 @@ impl PackStore {
         let official_packs = fs::read_dir(&pack_dir.join("official"))?
             .filter_map(|e| {
                 if e.is_ok() {
-                    if let Some(name) = e.unwrap().file_name().to_str() {
-                        Some(name.to_owned())
+                    if let Ok(name) = e {
+                        let pack = Self::read_pack(&name.path()).unwrap();
+                        Some((
+                            name.file_name().to_str().unwrap().to_owned(),
+                            (pack.official, pack.prompts.len(), pack.responses.len()),
+                        ))
                     } else {
                         None
                     }
@@ -37,12 +42,19 @@ impl PackStore {
                     None
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<HashMap<_, _>>();
+
         let custom_packs = fs::read_dir(&pack_dir.join("custom"))?
             .filter_map(|e| {
                 if e.is_ok() {
-                    if let Some(name) = e.unwrap().file_name().to_str() {
-                        Some(name.to_owned())
+                    if let Ok(name) = e {
+                        // This runs at startup I'm not handeling the unwrap
+                        let pack = Self::read_pack(&name.path()).unwrap();
+                        Some((
+                            // This unwrap should not fail
+                            name.file_name().to_str().unwrap().to_owned(),
+                            (pack.official, pack.prompts.len(), pack.responses.len()),
+                        ))
                     } else {
                         None
                     }
@@ -50,9 +62,9 @@ impl PackStore {
                     None
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<HashMap<_, _>>();
 
-        let mut possible_packs = Vec::new();
+        let mut possible_packs = HashMap::new();
 
         possible_packs.extend(official_packs.clone());
         possible_packs.extend(custom_packs);
@@ -61,7 +73,6 @@ impl PackStore {
             possible_packs,
             pack_dir: pack_dir.to_owned(),
             loaded_packs: HashMap::new(),
-            official_packs,
         };
 
         pack_store
@@ -79,8 +90,8 @@ impl PackStore {
         let pack_name = &format!("{}.json", pack_name);
         if self.loaded_packs.contains_key(pack_name) {
             Ok(self.loaded_packs.get(pack_name).unwrap().clone())
-        } else if self.possible_packs.contains(pack_name) {
-            let pack = if self.official_packs.contains(&pack_name.to_owned()) {
+        } else if let Some((official, ..)) = self.possible_packs.get(pack_name) {
+            let pack = if *official {
                 Self::read_pack(&self.official_dir().join(pack_name))?
             } else {
                 Self::read_pack(&self.custom_dir().join(pack_name))?
@@ -122,17 +133,22 @@ impl PackStore {
 
         match fs::write(self.custom_dir().join(&pack_name), json) {
             Ok(_) => {
-                self.possible_packs.push(format!("{}.json", pack_name));
+                self.possible_packs.insert(
+                    format!("{}.json", pack_name),
+                    (false, pack.prompts.len(), pack.responses.len()),
+                );
                 Ok(())
             }
             Err(e) => Err(format!("Error writing to file: {}", e)),
         }
     }
 
-    pub fn get_pack_names(&self) -> Vec<String> {
+    pub fn get_packs_meta(&self) -> Vec<(String, usize, usize)> {
         self.possible_packs
             .iter()
-            .map(|s| s.replace(".json", ""))
+            .map(|(name, (_, prompts, responses))| {
+                (name.replace(".json", ""), *prompts, *responses)
+            })
             .collect()
     }
 

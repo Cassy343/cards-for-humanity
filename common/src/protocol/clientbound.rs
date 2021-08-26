@@ -43,7 +43,7 @@ pub enum ClientBoundPacket {
     ServerList {
         servers: Vec<(Uuid, usize, Option<usize>)>,
     },
-    CardPacks(Vec<String>),
+    CardPacks(Vec<(String, usize, usize)>),
 }
 
 impl ClientBoundPacket {

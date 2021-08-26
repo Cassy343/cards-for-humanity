@@ -60,7 +60,7 @@ impl Listener for Lobby {
         match client_handler
             .send_packet(
                 client_id,
-                &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_pack_names()),
+                &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_packs_meta()),
             )
             .await
         {
@@ -146,7 +146,7 @@ impl Listener for Lobby {
                 client_handler
                     .send_packet(
                         sender_id,
-                        &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_pack_names()),
+                        &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_packs_meta()),
                     )
                     .await;
                 PacketResponse::Accepted

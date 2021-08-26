@@ -1,0 +1,34 @@
+@font-face {
+    font-family: 'JetBrains';
+    src: url(https://github.com/JetBrains/JetBrainsMono/blob/master/fonts/ttf/JetBrainsMono-Regular.ttf);
+}
+
+body {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    margin: 0px;
+    background: rgb(48, 128, 160);
+    padding: 0px;
+    overflow: hidden;
+}
+
+.button {
+    border-width: 2px;
+    border-radius: 7px;
+    border-color: black;
+    border-style: solid;
+    background-color: white;
+    padding: 3px;
+    max-width: max-content;
+    max-height: max-content;
+}
+
+.server-entry:hover,
+.button:hover {
+    background-color: rgb(166, 170, 173);
+
+}
+
+.server-entry:active,
+.button:active {
+    background-color: rgb(111, 112, 119);
+}
