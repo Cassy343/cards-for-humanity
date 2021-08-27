@@ -22,16 +22,17 @@ use std::{
     cell::{RefCell, RefMut},
     collections::HashMap,
     rc::Rc,
+    sync::{Arc, RwLock},
 };
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
 pub struct Game {
     pub id: Uuid,
-    pack_store: Rc<RefCell<PackStore>>,
+    pack_store: Arc<RwLock<PackStore>>,
     players: VecMap<Uuid, Player>,
     host_id: Uuid,
-    packs: Vec<Rc<Pack>>,
+    packs: Vec<Arc<Pack>>,
     available_prompts: Vec<CardID>,
     available_responses: Vec<CardID>,
     state: GameState,
@@ -46,13 +47,13 @@ impl Game {
     pub fn new(
         id: Uuid,
         host_id: Uuid,
-        pack_store: Rc<RefCell<PackStore>>,
+        pack_store: Arc<RwLock<PackStore>>,
         settings: GameSettings,
     ) -> Result<Self, String> {
         let mut loaded_packs = Vec::new();
 
         for pack_name in settings.packs {
-            loaded_packs.push(pack_store.borrow_mut().load_pack(&pack_name)?)
+            loaded_packs.push(pack_store.write().unwrap().load_pack(&pack_name)?)
         }
 
         Ok(Game {
@@ -433,15 +434,16 @@ impl Listener for Game {
                                     return PacketResponse::Rejected;
                                 }
 
-                                let pack = match self.pack_store.borrow_mut().load_pack(pack_name) {
-                                    Ok(pack) => pack,
-                                    Err(e) => {
-                                        let error =
-                                            format!("Failed to load pack {}: {}", pack_name, e);
-                                        error!("{}", error);
-                                        return PacketResponse::RejectedWithReason(error);
-                                    }
-                                };
+                                let pack =
+                                    match self.pack_store.write().unwrap().load_pack(pack_name) {
+                                        Ok(pack) => pack,
+                                        Err(e) => {
+                                            let error =
+                                                format!("Failed to load pack {}: {}", pack_name, e);
+                                            error!("{}", error);
+                                            return PacketResponse::RejectedWithReason(error);
+                                        }
+                                    };
                                 self.packs.push(pack);
                             }
                             GameSetting::RemovePack(pack_name) => {
@@ -639,7 +641,7 @@ impl Drop for Game {
         // Drop the loaded Packs
         self.packs = Vec::new();
 
-        let mut store: RefMut<PackStore> = self.pack_store.borrow_mut();
+        let mut store = self.pack_store.write().unwrap();
         for pack in packs {
             store.unload_pack(&pack)
         }

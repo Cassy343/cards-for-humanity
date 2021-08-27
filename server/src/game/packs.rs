@@ -7,6 +7,7 @@ use std::{
     io::{self, ErrorKind},
     path::{Path, PathBuf},
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 const DEFAULT_PACK: &str = "CAH Base Set";
@@ -15,7 +16,7 @@ const DEFAULT_PACK_JSON: &str = "CAH Base Set.json";
 /// A store to manage loading and unloading [Packs](Pack)
 pub struct PackStore {
     pack_dir: PathBuf,
-    loaded_packs: HashMap<String, Rc<Pack>>,
+    loaded_packs: HashMap<String, Arc<Pack>>,
     // bool is if the pack is official
     // usizes are prompts and responses respectively
     possible_packs: HashMap<String, (bool, usize, usize)>,
@@ -81,12 +82,12 @@ impl PackStore {
         Ok(pack_store)
     }
 
-    pub fn default_pack(&self) -> Rc<Pack> {
+    pub fn default_pack(&self) -> Arc<Pack> {
         self.loaded_packs.get(DEFAULT_PACK_JSON).unwrap().clone()
     }
 
     /// Loads in a pack from json
-    pub fn load_pack(&mut self, pack_name: &str) -> Result<Rc<Pack>, String> {
+    pub fn load_pack(&mut self, pack_name: &str) -> Result<Arc<Pack>, String> {
         let pack_name = &format!("{}.json", pack_name);
         if self.loaded_packs.contains_key(pack_name) {
             Ok(self.loaded_packs.get(pack_name).unwrap().clone())
@@ -98,7 +99,7 @@ impl PackStore {
             };
 
             self.loaded_packs
-                .insert(pack_name.to_owned(), Rc::new(pack));
+                .insert(pack_name.to_owned(), Arc::new(pack));
 
             Ok(self.loaded_packs.get(pack_name).unwrap().clone())
         } else {
@@ -117,14 +118,14 @@ impl PackStore {
             let pack = self.loaded_packs.get(pack_name).unwrap();
 
             // If the PackStore is the only owned Rc left, unload the pack
-            if Rc::strong_count(pack) == 1 {
+            if Arc::strong_count(pack) == 1 {
                 self.loaded_packs.remove(pack_name);
             }
         }
     }
 
     pub fn create_pack(&mut self, pack: Pack) -> Result<(), String> {
-        let pack_name = pack.name.clone();
+        let pack_name = format!("{}.json", pack.name.clone());
 
         let json = match serde_json::to_string(&pack) {
             Ok(j) => j,
@@ -133,10 +134,8 @@ impl PackStore {
 
         match fs::write(self.custom_dir().join(&pack_name), json) {
             Ok(_) => {
-                self.possible_packs.insert(
-                    format!("{}.json", pack_name),
-                    (false, pack.prompts.len(), pack.responses.len()),
-                );
+                self.possible_packs
+                    .insert(pack_name, (false, pack.prompts.len(), pack.responses.len()));
                 Ok(())
             }
             Err(e) => Err(format!("Error writing to file: {}", e)),

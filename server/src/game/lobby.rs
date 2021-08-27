@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, RwLock as StdRwLock},
+};
 
 use crate::network::{Listener, NetworkHandler};
 
@@ -15,12 +19,12 @@ use uuid::Uuid;
 use super::{packs::PackStore, Game};
 
 pub struct Lobby {
-    pack_store: Rc<RefCell<PackStore>>,
+    pack_store: Arc<StdRwLock<PackStore>>,
     games: Vec<Rc<RwLock<Game>>>,
 }
 
 impl Lobby {
-    pub fn new(pack_store: Rc<RefCell<PackStore>>) -> Self {
+    pub fn new(pack_store: Arc<StdRwLock<PackStore>>) -> Self {
         Lobby {
             pack_store,
             games: Vec::new(),
@@ -60,7 +64,7 @@ impl Listener for Lobby {
         match client_handler
             .send_packet(
                 client_id,
-                &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_packs_meta()),
+                &ClientBoundPacket::CardPacks(self.pack_store.read().unwrap().get_packs_meta()),
             )
             .await
         {
@@ -146,7 +150,9 @@ impl Listener for Lobby {
                 client_handler
                     .send_packet(
                         sender_id,
-                        &ClientBoundPacket::CardPacks(self.pack_store.borrow().get_packs_meta()),
+                        &ClientBoundPacket::CardPacks(
+                            self.pack_store.read().unwrap().get_packs_meta(),
+                        ),
                     )
                     .await;
                 PacketResponse::Accepted

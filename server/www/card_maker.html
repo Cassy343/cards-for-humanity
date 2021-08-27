@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf8">
+</head>
+<body>
+    Each card should be on a seperate line<br><br><br>
+    Pack Name:<input id="name">
+    <h3><b>Prompts</b></h3>
+    Have a single underscore (_) per blank<br>
+    <textarea id="prompts"></textarea>
+    <h3><b>Responses</b></h3>
+    <textarea id="responses"></textarea><br>
+    <button id="submit_button">Upload Pack</button><br>
+    <select id="pack_names"></select><button id="load_pack">Load Packs</button>
+    <script>
+        const prompts_input = document.getElementById('prompts');
+        const responses_input = document.getElementById('responses');
+        const pack_name_input = document.getElementById('name');
+        const submit_button = document.getElementById('submit_button');
+        const pack_name_options = document.getElementById('pack_names');
+        const load_packs = document.getElementById('load_pack');
+
+        function upload_pack(pack) {
+            fetch('./upload', {
+                method: 'POST',
+                body: JSON.stringify(pack),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(() => {});
+        }
+        
+        function make_pack(name, prompts, responses) {
+            return {
+                name: name,
+                official: false,
+                black: prompts.map(p => make_prompt(p)),
+                white: responses.map(r => make_response(r))
+            }
+        }
+
+        function make_prompt(card_text) {
+            return {
+                text: card_text,
+                pick: (card_text.match(/_/g) || []).length
+            }
+        }
+
+        function make_response(text) {
+            return {
+                text: text
+            }
+        }
+
+        async function fetch_pack(pack_name) {
+            let response = await fetch(`./packs/${pack_name}`);
+            return await response.json();
+        }
+
+        function load_pack() {
+            let pack_name = pack_name_options.value;
+            fetch_pack(pack_name).then((pack) => {
+                prompts_input.value = pack.black.map((p) => p.text).join("\n");
+                responses_input.value = pack.white.map((r) => r.text).join("\n");
+                pack_name_input.value = pack_name
+            });
+        }
+
+        async function load_pack_names() {
+            let response = await fetch('./packs');
+            let packs = await response.json();
+            pack_name_options.innerHTML = packs.map((p) => `<option>${p}</option>`).join('\n');
+        }
+
+        (() => {
+            load_pack_names().then(() => {
+                load_packs.onclick = load_pack;
+                submit_button.onclick = () => {
+                    let prompts = prompts_input.value.split('\n');
+                    let responses = responses_input.value.split('\n');
+                    let name = pack_name_input.value;
+                    let pack = make_pack(name, prompts, responses);
+                    upload_pack(pack);
+                };
+            })
+        })()
+    </script>
+</body>
