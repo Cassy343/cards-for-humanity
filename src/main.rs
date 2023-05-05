@@ -1,3 +1,0 @@
-mod data;
-
-fn main() {}

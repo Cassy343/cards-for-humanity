@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::copy, path::Path, process::Command};
+use std::{env, fs::File, io::copy, path::Path};
 use walkdir::WalkDir;
 use zip::ZipWriter;
 
@@ -8,19 +8,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dest = File::create(dest_path)?;
     let mut zip_writer = ZipWriter::new(dest);
 
-    add_directory_recursively(&mut zip_writer, "www")?;
-    add_directory_recursively(&mut zip_writer, "packs")?;
-
-    zip_writer.add_directory("www/client", Default::default())?;
-    copy_client_file(&mut zip_writer, "client.js")?;
-    copy_client_file(&mut zip_writer, "client_bg.wasm")?;
-
+    add_directory_recursively(&mut zip_writer, "public")?;
+    copy_client_file(&mut zip_writer, "cfh-bundle.js")?;
 
     zip_writer.finish()?;
 
-    println!("cargo:rerun-if-changed=../target/client-out/");
     println!("cargo:rerun-if-changed=../client/");
-    println!("cargo:rerun-if-changed=./www/");
+    println!("cargo:rerun-if-changed=./public/");
     Ok(())
 }
 
@@ -50,9 +44,9 @@ fn copy_client_file(
     zip_writer: &mut ZipWriter<File>,
     name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    zip_writer.start_file(&format!("www/client/{}", name), Default::default())?;
+    zip_writer.start_file(&format!("public/{}", name), Default::default())?;
     copy(
-        &mut File::open(&format!("../target/client-out/{}", name))?,
+        &mut File::open(&format!("../client/build/{}", name))?,
         zip_writer,
     )?;
     Ok(())
