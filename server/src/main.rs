@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow;
-use warp::Filter;
+use warp::{ws::Ws, Filter};
 use zip::ZipArchive;
 
 const CLIENT_FILES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client.zip"));
@@ -25,8 +25,13 @@ async fn main() -> anyhow::Result<()> {
 
     let index = warp::path::end().and(warp::fs::file("public/index.html"));
     let public = warp::fs::dir("public/").or(index);
+    let ws = warp::path("ws").and(warp::ws()).map(|ws: Ws| {
+        ws.on_upgrade(move |socket| async {
+            println!("Got WS connection");
+        })
+    });
 
-    warp::serve(public).bind(([0, 0, 0, 0], 25565)).await;
+    warp::serve(public.or(ws)).bind(([0, 0, 0, 0], 25565)).await;
 
     Ok(())
 }

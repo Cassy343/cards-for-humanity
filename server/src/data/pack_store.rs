@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context};
 use std::{
     collections::HashMap,
     convert::AsRef,
@@ -16,66 +17,56 @@ const DEFAULT_PACK_JSON: &str = "CAH Base Set.json";
 pub struct PackStore {
     pack_dir: PathBuf,
     loaded_packs: HashMap<String, Arc<Pack>>,
-    // bool is if the pack is official
-    // usizes are prompts and responses respectively
     possible_packs: HashMap<String, PackMeta>,
 }
 
 impl PackStore {
     /// Creates a new PackStore
     pub fn new<P: AsRef<Path>>(pack_dir: P) -> std::io::Result<Self> {
-        let pack_dir = pack_dir.as_ref();
+        let mut pack_store = Self {
+            pack_dir: pack_dir.as_ref().to_owned(),
+            loaded_packs: HashMap::new(),
+            possible_packs: HashMap::new(),
+        };
+        pack_store.init()?;
+        Ok(pack_store)
+    }
 
-        let official_packs = fs::read_dir(&pack_dir.join("official"))?
+    fn init(&mut self) -> io::Result<()> {
+        let official_packs = fs::read_dir(&self.official_dir())?
             .filter_map(|e| {
-                if e.is_ok() {
-                    if let Ok(name) = e {
-                        let pack = Self::read_pack(&name.path()).unwrap();
-                        Some((name.file_name().to_str().unwrap().to_owned(), pack.meta()))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                e.ok().map(|name| {
+                    let pack = Self::read_pack(&name.path()).unwrap();
+                    (name.file_name().to_str().unwrap().to_owned(), pack.meta())
+                })
             })
             .collect::<HashMap<_, _>>();
 
-        let custom_packs = fs::read_dir(&pack_dir.join("custom"))?
+        let custom_packs = fs::read_dir(&self.custom_dir())?
             .filter_map(|e| {
-                if e.is_ok() {
-                    if let Ok(name) = e {
-                        // This runs at startup I'm not handeling the unwrap
-                        let pack = Self::read_pack(&name.path()).unwrap();
-                        Some((
-                            // This unwrap should not fail
-                            name.file_name().to_str().unwrap().to_owned(),
-                            pack.meta(),
-                        ))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                e.ok().map(|name| {
+                    // This runs at startup I'm not handeling the unwrap
+                    let pack = Self::read_pack(&name.path()).unwrap();
+                    (
+                        // This unwrap should not fail
+                        name.file_name().to_str().unwrap().to_owned(),
+                        pack.meta(),
+                    )
+                })
             })
             .collect::<HashMap<_, _>>();
 
         let mut possible_packs = HashMap::new();
 
-        possible_packs.extend(official_packs.clone());
+        possible_packs.extend(official_packs);
         possible_packs.extend(custom_packs);
 
-        let mut pack_store = PackStore {
-            possible_packs,
-            pack_dir: pack_dir.to_owned(),
-            loaded_packs: HashMap::new(),
-        };
+        self.possible_packs = possible_packs;
 
-        pack_store
-            .load_pack(DEFAULT_PACK)
+        self.load_pack(DEFAULT_PACK)
             .map_err(|_| io::Error::new(ErrorKind::NotFound, "Default pack file not found."))?;
-        Ok(pack_store)
+
+        Ok(())
     }
 
     pub fn default_pack(&self) -> Arc<Pack> {
@@ -83,23 +74,27 @@ impl PackStore {
     }
 
     /// Loads in a pack from json
-    pub fn load_pack(&mut self, pack_name: &str) -> Result<Arc<Pack>, String> {
+    pub fn load_pack(&mut self, pack_name: &str) -> anyhow::Result<Arc<Pack>> {
         let pack_name = &format!("{}.json", pack_name);
-        if self.loaded_packs.contains_key(pack_name) {
-            Ok(self.loaded_packs.get(pack_name).unwrap().clone())
-        } else if let Some(PackMeta { official, .. }) = self.possible_packs.get(pack_name) {
+
+        if let Some(pack) = self.loaded_packs.get(pack_name) {
+            return Ok(Arc::clone(pack));
+        }
+
+        if let Some(PackMeta { official, .. }) = self.possible_packs.get(pack_name) {
             let pack = if *official {
                 Self::read_pack(&self.official_dir().join(pack_name))?
             } else {
                 Self::read_pack(&self.custom_dir().join(pack_name))?
             };
 
+            let pack = Arc::new(pack);
             self.loaded_packs
-                .insert(pack_name.to_owned(), Arc::new(pack));
+                .insert(pack_name.to_owned(), Arc::clone(&pack));
 
-            Ok(self.loaded_packs.get(pack_name).unwrap().clone())
+            Ok(pack)
         } else {
-            Err(format!("Pack {} is not found", pack_name))
+            Err(anyhow!("Pack {} is not found", pack_name))
         }
     }
 
@@ -120,48 +115,26 @@ impl PackStore {
         }
     }
 
-    pub fn create_pack(&mut self, pack: Pack) -> Result<(), String> {
+    pub fn create_pack(&mut self, pack: Pack) -> anyhow::Result<()> {
         let pack_name = format!("{}.json", pack.name.clone());
 
-        let json = match serde_json::to_string(&pack) {
-            Ok(j) => j,
-            Err(e) => return Err(format!("Error serializing pack: {}", e)),
-        };
-
-        match fs::write(self.custom_dir().join(&pack_name), json) {
-            Ok(_) => {
-                let mut meta = pack.meta();
-                meta.official = false;
-                self.possible_packs.insert(pack_name, meta);
-                Ok(())
-            }
-            Err(e) => Err(format!("Error writing to file: {}", e)),
-        }
+        let json = serde_json::to_string(&pack).context("Error serializing pack")?;
+        fs::write(self.custom_dir().join(&pack_name), json).context("Error saving pack")?;
+        let mut meta = pack.meta();
+        meta.official = false;
+        self.possible_packs.insert(pack_name, meta);
+        Ok(())
     }
 
-    pub fn get_packs_meta(&self) -> Vec<(String, usize, usize)> {
-        self.possible_packs
-            .iter()
-            .map(
-                |(
-                    name,
-                    &PackMeta {
-                        num_prompts,
-                        num_responses,
-                        ..
-                    },
-                )| { (name.replace(".json", ""), num_prompts, num_responses) },
-            )
-            .collect()
+    pub fn possible_packs(&self) -> &HashMap<String, PackMeta> {
+        &self.possible_packs
     }
 
-    fn read_pack(path: &Path) -> Result<Pack, String> {
-        let json = match fs::read_to_string(path) {
-            Ok(f) => f,
-            Err(e) => return Err(format!("Error reading pack file: {}", e)),
-        };
-
-        serde_json::from_str::<Pack>(&json).map_err(|e| format!("Error deserializing pack: {}", e))
+    fn read_pack(path: &Path) -> anyhow::Result<Pack> {
+        let json = fs::read_to_string(path).context("Error reading pack file")?;
+        serde_json::from_str::<Pack>(&json)
+            .context("Error deserializing pack")
+            .map_err(Into::into)
     }
 
     fn official_dir(&self) -> PathBuf {
