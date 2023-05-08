@@ -2,7 +2,8 @@ import { Context, createContext } from "react";
 import { Websocket } from "websocket-ts/lib";
 
 export type Session = {
-    socket: Websocket | null
+    socket: Websocket | null,
+    username: string
 };
 
 // @ts-ignore
