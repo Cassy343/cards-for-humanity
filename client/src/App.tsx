@@ -59,9 +59,12 @@ const App = () => {
 
     useEffect(() => connectWs(session, dispatch), []);
 
-    const sendMessage = (message: any) => {
+    const sendMessage = (type: string, payload: any) => {
         if (session.socket) {
-            session.socket.send(JSON.stringify(message));
+            session.socket.send(JSON.stringify({
+                ...payload,
+                'type': type,
+            }));
         }
     };
 
@@ -70,10 +73,8 @@ const App = () => {
             type: 'username',
             payload: username
         });
-        sendMessage({
-            'SetUsername': {
-                'username': username
-            }
+        sendMessage('SetUsername', {
+            'username': username
         });
     };
 
