@@ -6,7 +6,7 @@ use warp::ws::{Message, WebSocket};
 
 use crate::{
     chan::{channel, Tx},
-    game::{GameHandle, JoinGame, JoinResponse, PlayerGameId},
+    game::{GameHandle, JoinGame, JoinResponse, LeaveGame, PlayerGameId},
     lobby::{CreateGame, GetGameHandle, LobbyMessage},
 };
 use tokio::task;
@@ -30,7 +30,9 @@ pub async fn handle_socket(socket: WebSocket, lobby: Tx<LobbyMessage>) {
     let mut client = Client::new(tx, ws_sink, lobby);
 
     while let Some(message) = rx.recv().await {
-        client.handle_message(message).await;
+        if !client.handle_message(message).await {
+            return;
+        }
     }
 }
 
@@ -41,7 +43,8 @@ async fn forward(mut stream: SplitStream<WebSocket>, sink: Tx<ClientMessage>) {
                 let text = match message.to_str() {
                     Ok(text) => text,
                     Err(_) => {
-                        todo!("We didn't receive text");
+                        // TODO: maybe do something other than ignore the message?
+                        continue;
                     }
                 };
 
@@ -88,20 +91,29 @@ impl Client {
         }
     }
 
-    async fn handle_message(&mut self, message: ClientMessage) {
+    async fn handle_message(&mut self, message: ClientMessage) -> bool {
         match message {
             ClientMessage::External(External(message)) => {
                 if let Some(response) = self.handle_external_message(message).await {
                     self.send_external(response).await;
                 }
             }
-            ClientMessage::WsDisconnected(_) => self.handle_ws_disconnected(),
+            ClientMessage::WsDisconnected(_) => {
+                self.handle_ws_disconnected().await;
+                return false;
+            }
             ClientMessage::PlayerListUpdate(update) => self.handle_player_list_update(update).await,
         }
+
+        true
     }
 
-    fn handle_ws_disconnected(&self) {
-        todo!()
+    async fn handle_ws_disconnected(&self) {
+        if let Some(game) = &self.current_game {
+            game.handle.game.send(LeaveGame { id: game.id }).await;
+        }
+
+        println!("Player disconnected");
     }
 
     async fn handle_player_list_update(&mut self, update: PlayerListUpdate) {
@@ -136,11 +148,15 @@ impl Client {
                 username,
             })
             .await;
-        let id = handle.creator_id;
-        self.current_game = Some(PlayerGameHandle { handle, id });
+        let game_id = handle.id;
+        let player_id = handle.creator_id;
+        self.current_game = Some(PlayerGameHandle {
+            handle,
+            id: player_id,
+        });
 
         Some(ExternalClientMessage::JoinResponse {
-            response: Some(JoinResponse::JoinAsPlayer { id }),
+            response: Some(JoinResponse::JoinAsPlayer { game_id, player_id }),
         })
     }
 
@@ -160,8 +176,11 @@ impl Client {
             })
             .await;
 
-        if let &JoinResponse::JoinAsPlayer { id } = &response {
-            self.current_game = Some(PlayerGameHandle { handle, id });
+        if let &JoinResponse::JoinAsPlayer { player_id, .. } = &response {
+            self.current_game = Some(PlayerGameHandle {
+                handle,
+                id: player_id,
+            });
         }
 
         Some(ExternalClientMessage::JoinResponse {

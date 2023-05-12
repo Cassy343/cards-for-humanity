@@ -1,15 +1,16 @@
 // import './App.css';
 
 import { useEffect, useReducer, useState } from "react";
-import { Session, SessionContext } from "./Context";
+import { Session, SessionContext, useCfhWs } from "./Session";
 import { WebsocketBuilder } from 'websocket-ts';
 import { Route, Routes } from "react-router";
 import { BrowserRouter } from "react-router-dom";
 import Homepage from "./homepage/Homepage";
 import Lobby from "./lobby/Lobby";
+import Game from "./game/Game";
 
 type SessionAction = {
-    type: 'socket' | 'username',
+    type: 'setUsername' | 'setIds',
     payload: any
 };
 
@@ -17,60 +18,30 @@ type SessionReducer = (session: Session, action: SessionAction) => Session;
 
 const sessionReducer: SessionReducer = (session, action) => {
     switch (action.type) {
-        case 'socket':
-            return {
-                ...session,
-                socket: action.payload
-            }
-        case 'username':
+        case 'setUsername':
             return {
                 ...session,
                 username: action.payload
             }
+        case 'setIds':
+            console.log(`Game ID: ${action.payload.game_id}, Player ID: ${action.payload.player_id}`);
+            return {
+                ...session,
+                ids: action.payload
+            }
     }
 };
 
-const connectWs = (session: Session, dispatch: Function) => {
-    new WebsocketBuilder(`ws://${window.location.host}/ws`)
-        .onOpen((ws, e) => {
-            dispatch({
-                type: 'socket',
-                payload: ws
-            });
-
-            console.log("WS Connected");
-        })
-        .onClose((ws, e) => {
-            dispatch({
-                type: 'socket',
-                payload: null
-            });
-
-            console.log("WS Disconnected");
-        })
-        .build();
-}
-
 const App = () => {
     const [session, dispatch] = useReducer(sessionReducer, {
-        socket: null,
-        username: ''
+        username: '',
+        ids: null
     });
-
-    useEffect(() => connectWs(session, dispatch), []);
-
-    const sendMessage = (msg: string, payload: any) => {
-        if (session.socket) {
-            session.socket.send(JSON.stringify({
-                ...payload,
-                'msg': msg,
-            }));
-        }
-    };
+    const { sendMessage } = useCfhWs(_ => false);
 
     const setUsername = (username: string) => {
         dispatch({
-            type: 'username',
+            type: 'setUsername',
             payload: username
         });
         sendMessage('SetUsername', {
@@ -88,7 +59,17 @@ const App = () => {
                     />
                     <Route
                         path='/lobby'
-                        element={<Lobby />}
+                        element={<Lobby setIds={(game_id, player_id) => dispatch({
+                            type: 'setIds',
+                            payload: {
+                                game_id: game_id,
+                                player_id: player_id
+                            }
+                        })} />}
+                    />
+                    <Route
+                        path='/game'
+                        element={<Game />}
                     />
                 </Routes>
             </BrowserRouter>

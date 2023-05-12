@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use crate::{chan::Tx, client::ClientMessage, game::GameHandle, proto};
 
 proto!(

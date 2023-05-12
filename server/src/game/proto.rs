@@ -20,8 +20,10 @@ pub struct JoinGame {
 #[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum JoinResponse {
-    JoinAsPlayer { id: PlayerGameId },
-    JoinAsSpectator,
+    JoinAsPlayer {
+        game_id: u16,
+        player_id: PlayerGameId,
+    },
     Rejected,
 }
 

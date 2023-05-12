@@ -2,12 +2,11 @@ import './Homepage.css';
 
 import { Box, Button, Card, FormControl, Input, Stack, Typography } from "@mui/material";
 import { useContext, useRef, useState } from "react";
-import { SessionContext } from '../Context';
+import { SessionContext } from '../Session';
 import { Navigate } from 'react-router';
 
-type setUsernameCallback = (username: string) => void;
 type HomepageProps = {
-    setUsername: setUsernameCallback
+    setUsername: (username: string) => void
 };
 
 const Homepage = (props: HomepageProps) => {

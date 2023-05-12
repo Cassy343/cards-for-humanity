@@ -52,7 +52,7 @@ impl Lobby {
             game_id = rng.gen();
         }
 
-        let handle = create_game(game_id, client, username);
+        let handle = create_game(client, username, game_id);
         self.games.insert(game_id, handle.clone());
         handle
     }
