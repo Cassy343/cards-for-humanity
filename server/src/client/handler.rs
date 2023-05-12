@@ -6,7 +6,7 @@ use warp::ws::{Message, WebSocket};
 
 use crate::{
     chan::{channel, Tx},
-    game::{GameHandle, JoinGame, JoinResponse},
+    game::{GameHandle, JoinGame, JoinResponse, PlayerGameId},
     lobby::{CreateGame, GetGameHandle, LobbyMessage},
 };
 use tokio::task;
@@ -66,7 +66,7 @@ struct Client {
     ws: WsSink,
     lobby: Tx<LobbyMessage>,
     username: Option<String>,
-    current_game: Option<GameHandle>,
+    current_game: Option<PlayerGameHandle>,
 }
 
 impl Client {
@@ -136,8 +136,12 @@ impl Client {
                 username,
             })
             .await;
-        self.current_game = Some(handle);
-        None
+        let id = handle.creator_id;
+        self.current_game = Some(PlayerGameHandle { handle, id });
+
+        Some(ExternalClientMessage::JoinResponse {
+            response: Some(JoinResponse::JoinAsPlayer { id }),
+        })
     }
 
     async fn handle_join_game(&mut self, id: u16) -> Option<ExternalClientMessage> {
@@ -156,12 +160,17 @@ impl Client {
             })
             .await;
 
-        if !matches!(response, JoinResponse::Rejected) {
-            self.current_game = Some(handle);
+        if let &JoinResponse::JoinAsPlayer { id } = &response {
+            self.current_game = Some(PlayerGameHandle { handle, id });
         }
 
         Some(ExternalClientMessage::JoinResponse {
             response: Some(response),
         })
     }
+}
+
+struct PlayerGameHandle {
+    handle: GameHandle,
+    id: PlayerGameId,
 }

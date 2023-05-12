@@ -41,7 +41,6 @@ const Homepage = (props: HomepageProps) => {
                         onClick={_ => props.setUsername(tmpUsername)}
                     >Join Lobby</Button>
                 </Stack>
-
             </Card>
         </Box>
     </>);

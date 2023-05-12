@@ -1,6 +1,6 @@
 use crate::{
-    chan::{channel, OneshotTx, Rx, Tx},
-    client::ClientMessage,
+    chan::{channel, Message, OneshotTx, Rx, Tx},
+    client::{ClientMessage, PlayerInfo, PlayerListUpdate},
 };
 use tokio::task;
 
@@ -16,6 +16,7 @@ pub fn create_game(
     let creator = PlayerHandle {
         client: creator_client,
         username: creator_username.clone(),
+        points: 0,
     };
 
     task::spawn(handle_game(rx, creator));
@@ -53,6 +54,30 @@ impl Game {
         }
     }
 
+    fn broadcast<T>(&mut self, message: T)
+    where T: Message<ClientMessage> + Clone {
+        for player in self.players.iter().flatten() {
+            let _ = player.client.send(message.clone());
+        }
+    }
+
+    fn gen_player_list_update(&self) -> PlayerListUpdate {
+        PlayerListUpdate {
+            host: self.players.iter().position(Option::is_some).unwrap(),
+            players: self
+                .players
+                .iter()
+                .enumerate()
+                .flat_map(|(index, player)| player.as_ref().map(|p| (index, p)))
+                .map(|(id, player)| PlayerInfo {
+                    id,
+                    username: player.username.clone(),
+                    points: player.points,
+                })
+                .collect(),
+        }
+    }
+
     fn handle_message(&mut self, message: GameMessage) {
         match message {
             GameMessage::JoinGame(JoinGame { client, username }, response) =>
@@ -63,7 +88,13 @@ impl Game {
 
     fn handle_join_game(&mut self, client: Tx<ClientMessage>, username: String) -> JoinResponse {
         // TODO: check against max player/spectator amount
-        self.players.push(Some(PlayerHandle { client, username }));
+        self.players.push(Some(PlayerHandle {
+            client,
+            username,
+            points: 0,
+        }));
+
+        self.broadcast(self.gen_player_list_update());
 
         JoinResponse::JoinAsPlayer {
             id: self.players.len(),
@@ -78,4 +109,5 @@ impl Game {
 struct PlayerHandle {
     client: Tx<ClientMessage>,
     username: String,
+    points: u32,
 }

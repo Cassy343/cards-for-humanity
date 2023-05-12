@@ -59,11 +59,11 @@ const App = () => {
 
     useEffect(() => connectWs(session, dispatch), []);
 
-    const sendMessage = (type: string, payload: any) => {
+    const sendMessage = (msg: string, payload: any) => {
         if (session.socket) {
             session.socket.send(JSON.stringify({
                 ...payload,
-                'type': type,
+                'msg': msg,
             }));
         }
     };

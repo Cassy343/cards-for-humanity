@@ -14,15 +14,15 @@ pub struct External(pub ExternalServerMessage);
 
 pub struct WsDisconnected;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct PlayerListUpdate {
-    host: PlayerGameId,
-    players: Vec<PlayerInfo>,
+    pub host: PlayerGameId,
+    pub players: Vec<PlayerInfo>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct PlayerInfo {
-    id: PlayerGameId,
-    name: String,
-    points: u32,
+    pub id: PlayerGameId,
+    pub username: String,
+    pub points: u32,
 }

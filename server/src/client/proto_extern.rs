@@ -5,7 +5,7 @@ use crate::game::JoinResponse;
 use super::proto::PlayerListUpdate;
 
 #[derive(Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "msg")]
 pub enum ExternalServerMessage {
     SetUsername { username: String },
     CreateGame,
@@ -13,7 +13,7 @@ pub enum ExternalServerMessage {
 }
 
 #[derive(Serialize)]
-#[serde(tag = "type")]
+#[serde(tag = "msg")]
 pub enum ExternalClientMessage {
     PlayerListUpdate {
         #[serde(flatten)]
